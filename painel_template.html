@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="refresh" content="60">
+  <title>Monitor dos andares</title>
+  <style>
+    :root { color-scheme: light dark; --bg:#f4f6f8; --card:#fff; --fg:#18212b; --muted:#637083; --line:#d8dee6; --accent:#315fce; --ok:#22834b; --warn:#a25b00; --critical:#bb2430; }
+    @media (prefers-color-scheme: dark) { :root { --bg:#121820; --card:#1c2631; --fg:#e8edf3; --muted:#a7b3c1; --line:#354250; --accent:#8aa9ff; --ok:#65ce8c; --warn:#ffc06b; --critical:#ff7880; } }
+    * { box-sizing:border-box; } body { margin:0; padding:20px; background:var(--bg); color:var(--fg); font:15px/1.45 system-ui,sans-serif; }
+    main { max-width:1400px; margin:auto; } h1 { margin:0 0 4px; font-size:1.6rem; } .meta { color:var(--muted); margin-bottom:18px; }
+    nav { display:flex; flex-wrap:wrap; gap:8px; margin:14px 0; } button { border:1px solid var(--line); border-radius:8px; padding:9px 13px; background:var(--card); color:var(--fg); cursor:pointer; } button[aria-selected="true"] { background:var(--accent); color:#fff; border-color:var(--accent); }
+    section[role="tabpanel"] { display:none; background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; overflow:auto; } section[role="tabpanel"].active { display:block; }
+    .source { color:var(--muted); margin:8px 0 14px; } .counts { color:var(--muted); margin:8px 0 14px; }
+    table { width:100%; border-collapse:collapse; min-width:650px; } th,td { text-align:left; vertical-align:top; padding:10px 9px; border-bottom:1px solid var(--line); } th { color:var(--muted); font-size:.88rem; }
+    .bar { display:inline-block; width:min(160px,25vw); height:10px; border-radius:8px; background:var(--line); overflow:hidden; vertical-align:middle; } .bar i { display:block; height:100%; background:var(--ok); } .AVISO .bar i { background:var(--warn); } .CRITICO .bar i { background:var(--critical); }
+    @media (max-width:600px) { body { padding:12px; } section[role="tabpanel"] { padding:11px; } h1 { font-size:1.35rem; } }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Monitor dos andares</h1>
+  <div class="meta">Atualizado em <time>{{UPDATED_AT}}</time> · dados: {{DATA_AGE}}</div>
+  <nav role="tablist" aria-label="Seções do painel">
+    <button role="tab" aria-selected="true" aria-controls="floors">Andares</button>
+    <button role="tab" aria-selected="false" aria-controls="demands">Demandas</button>
+    <button role="tab" aria-selected="false" aria-controls="proposals">Propostos</button>
+    <button role="tab" aria-selected="false" aria-controls="accounts">Limites das contas</button>
+  </nav>
+  <section id="floors" role="tabpanel" class="active">
+    <p class="source">Fonte: {{SOURCE_STATUS}}</p>
+    <table><thead><tr><th>Andar</th><th>Estado</th><th>Item/status atual</th><th>Terminal</th><th>Terminal ativo</th><th>Última atividade</th><th>Min sem mudança</th><th>Alerta</th><th>HEAD</th></tr></thead><tbody>{{FLOOR_ROWS}}</tbody></table>
+    <h2>Eventos ativos</h2><table><thead><tr><th>Tipo</th><th>Alvo</th><th>Detalhe</th></tr></thead><tbody>{{EVENT_ROWS}}</tbody></table>
+  </section>
+  <section id="demands" role="tabpanel">
+    <p class="counts">{{ROADMAP_COUNTS}}</p>
+    <table><thead><tr><th>Item</th><th>Estado</th><th>Demanda</th><th>Dependências</th></tr></thead><tbody>{{DEMAND_ROWS}}</tbody></table>
+  </section>
+  <section id="proposals" role="tabpanel">
+    <table><thead><tr><th>Andar</th><th>Item</th><th>Dependências</th><th>Motivo</th><th>Risco de conflito</th></tr></thead><tbody>{{PROPOSAL_ROWS}}</tbody></table>
+  </section>
+  <section id="accounts" role="tabpanel">
+    <table><thead><tr><th>Conta</th><th>Janela</th><th>Uso</th><th>Nível</th><th>Reset</th><th>Ritmo</th><th>Recomendação</th></tr></thead><tbody>{{ACCOUNT_ROWS}}</tbody></table>
+  </section>
+</main>
+<script>
+  const tabs=[...document.querySelectorAll('[role="tab"]')];
+  tabs.forEach(tab=>tab.addEventListener('click',()=>{tabs.forEach(item=>item.setAttribute('aria-selected',String(item===tab)));document.querySelectorAll('[role="tabpanel"]').forEach(panel=>panel.classList.toggle('active',panel.id===tab.getAttribute('aria-controls')))}));
+</script>
+</body>
+</html>

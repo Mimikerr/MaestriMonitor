@@ -1,0 +1,43 @@
+{
+  "workspace_name": "Smart-balança",
+  "thresholds": {
+    "warning": 75,
+    "critical": 90,
+    "stalled_minutes": 30,
+    "reminder_minutes": 120
+  },
+  "contas_vigiadas": ["Claude Code", "Codex", "Squad IA"],
+  "floors": [
+    {
+      "name": "Ground",
+      "branch": "dev",
+      "track": ["R23", "R24", "R25", "R26", "R27", "R28", "R55", "R51"]
+    },
+    {
+      "name": "Dev 2",
+      "branch": "dev-home",
+      "track": ["R29", "R30", "R49"]
+    },
+    {
+      "name": "Dev 3",
+      "branch": "dev-3",
+      "track": ["R38", "R39", "R40", "R41"]
+    }
+  ],
+  "items": {
+    "R06": {"risks": ["baseline"]},
+    "R08": {"risks": ["baseline"]},
+    "R20": {"risks": ["schema"]},
+    "R24": {"risks": ["schema"]},
+    "R28": {"risks": ["container"]},
+    "R31": {"risks": ["schema", "container"]},
+    "R32": {"risks": ["container"]},
+    "R33": {"risks": ["schema"]},
+    "R38": {"risks": ["container"]},
+    "R39": {"risks": ["container"]},
+    "R40": {"risks": ["container"]},
+    "R41": {"risks": ["container"]},
+    "R42": {"risks": ["container"]},
+    "R43": {"risks": ["container"]}
+  }
+}

@@ -1,0 +1,10 @@
+# Martelo - correcoes apos parecer da Sentinela (commit fec6e81)
+
+Parecer: 137 testes OK, check_file_size OK, check_e2e_tags OK, higiene OK. Pendencias (TDD: teste vermelho primeiro, depois verde, novo commit `fix(tools): ...`):
+
+1. ALTA monitor_check.py:311-340: Ground nao tem status em payload.floors, hoje cai silenciosamente em "ocioso" e nunca alerta. Corrigir: sem status publicado, derivar o estado do Ground pelos sinais (HEAD de `dev` local, lastActiveAt do terminal do orquestrador "Claude Code", hash de git status se barato). Ground com sinais mudando = working; sem mudar >=30 min = parado; so e "ocioso" se nao ha status E nada mudou E nao ha item [~] do Ground no roadmap. Mesma regra deve valer para qualquer andar sem status. Testes para os tres casos.
+2. MEDIA monitor-config.json:26-29: verificar no roadmap de origin/dev quais itens estao [~] e quais sao de schema Room/AppContainer (R24 aparece [x] no roadmap, confirme se a Sentinela errou ou se o config ainda o trata como em andamento). Marque risco schema/container em TODOS os itens que o CLAUDE.md lista como donos unicos (R24, R20 e quaisquer outros que mexam em version/Migration/schemas, AppContainer, App.kt, baseline) e teste que a proposta nao sugere dois itens de schema ao mesmo tempo nem um enquanto outro [~] de schema existir.
+3. NOVO: contas que o time nao usa (Antigravity esta com janelas semanais em 93,86% e 86,57%) nao devem gerar push critico. Adicione em monitor-config.json uma lista `contas_vigiadas` (default: Claude Code, Codex Padrao, Codex Squad IA) ou `contas_informativas`; as informativas aparecem no painel mas nao geram evento. Teste.
+4. Execucao real autorizada: rode o script UMA vez no estado real (ele roda git fetch e grava state.json/painel.html em StudioProjects/.maestri/monitor/, como previsto), mostre exit code, eventos e confira o painel (4 abas, % iguais ao .status.json). Rode de novo logo em seguida: segundo run deve dar exit 1 (anti-spam) se nada mudou.
+
+Ao final: unittest + check_file_size verdes, git status limpo (nao commite __pycache__), reporte com maestri ask "Claude Code" "<resultado>".
