@@ -85,7 +85,7 @@ class MonitorCheckTests(unittest.TestCase):
         elif args[:2] == ["git", "-C"] and args[-3:] == ["status", "--short", "--branch"]:
             Result.stdout = self.status_hash or ""
             Result.returncode = 0 if self.status_hash is not None else 1
-        if args[:3] == ["git", "show", "origin/dev:docs/roadmap.md"]:
+        if args[-1] == "origin/dev:docs/roadmap.md":
             Result.stdout = self.roadmap
         return Result()
 
@@ -185,7 +185,7 @@ class MonitorCheckTests(unittest.TestCase):
         write_json(self.workspace, self.workspace_data)
         self.set_roadmap("")
         self.assertTrue(any(e.kind == "review" for e in self.run_check().events))
-        marker_dir = self.root / "routine-andares"
+        marker_dir = self.root / "marcadores"
         marker_dir.mkdir()
         (marker_dir / "Dev2.avisado").write_text("seen", encoding="utf-8")
         self.config_data = json.loads(self.config.read_text(encoding="utf-8"))
@@ -193,6 +193,23 @@ class MonitorCheckTests(unittest.TestCase):
         write_json(self.config, self.config_data)
         write_json(self.runtime / "state.json", {"floors": {}, "events": {}})
         self.assertFalse(any(e.kind == "review" for e in self.run_check().events))
+
+    def test_repeated_nonworking_error_status_for_30_minutes_is_travado(self):
+        self.workspace_data["payload"]["floors"][0]["status"] = {
+            "state": "error", "text": "socket timeout", "progress": 0,
+        }
+        write_json(self.workspace, self.workspace_data)
+        status = self.workspace_data["payload"]["floors"][0]["status"]
+        write_json(self.runtime / "state.json", {"floors": {"Dev 2": {
+            "signals": {"status": monitor._status_signature(status), "head": "abc123",
+                        "git_status": None, "lastActiveAt": None},
+            "last_change": (NOW - timedelta(minutes=31)).isoformat(),
+            "status_last_change": (NOW - timedelta(minutes=31)).isoformat(),
+        }}, "events": {}})
+        self.set_roadmap("")
+        self.head = "new-head"
+        result = self.run_check()
+        self.assertTrue(any(event.kind == "travado" and event.target == "Dev 2" for event in result.events))
 
     def test_account_thresholds_and_rhythm(self):
         status = {"providers": [{"name": "Claude Code", "plan": "Pro", "state": "active", "meters": [

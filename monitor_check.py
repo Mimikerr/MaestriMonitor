@@ -356,6 +356,12 @@ def _floor_views(payload: dict[str, Any], config: dict[str, Any], repo: Path,
                    "lastActiveAt": last_active}
         previous = old_floors.get(name, {}) if isinstance(old_floors, dict) else {}
         previous_signals = previous.get("signals") if isinstance(previous, dict) else None
+        status_signature = _status_signature(status)
+        previous_status_signature = previous_signals.get("status") if isinstance(previous_signals, dict) else None
+        status_last_change = _parse_time(previous.get("status_last_change")) if isinstance(previous, dict) else None
+        if status_signature != previous_status_signature or status_last_change is None:
+            status_last_change = now
+        status_elapsed_minutes = max(0, int((now - status_last_change).total_seconds() // 60))
         last_change = _parse_time(previous.get("last_change")) if isinstance(previous, dict) else None
         if not isinstance(previous_signals, dict) or previous_signals != signals or last_change is None:
             last_change = now
@@ -373,6 +379,10 @@ def _floor_views(payload: dict[str, Any], config: dict[str, Any], repo: Path,
             events.append(Event("travado", name, "CRITICO", f"blocked há {elapsed_minutes} min: {status_text}", "consultar o orquestrador"))
         elif status_state == "working" and elapsed_minutes >= threshold:
             events.append(Event("parado", name, "AVISO", f"sem sinal novo há {elapsed_minutes} min", "consultar o orquestrador"))
+        elif status_state not in ("", "working", "review", "done", "blocked") and status_text and status_elapsed_minutes >= threshold:
+            events.append(Event("travado", name, "CRITICO",
+                                f"status {status_state} sem mudança há {status_elapsed_minutes} min: {status_text}",
+                                "consultar o orquestrador"))
         if not status_state and has_activity_signals and elapsed_minutes >= threshold:
             events.append(Event("parado", name, "AVISO", f"sem sinal novo há {elapsed_minutes} min", "consultar o orquestrador"))
         if status_state:
@@ -389,7 +399,8 @@ def _floor_views(payload: dict[str, Any], config: dict[str, Any], repo: Path,
                       "terminal_status": terminal.get("status", "indisponível"),
                       "last_active": last_active or "indisponível", "idle_minutes": elapsed_minutes,
                       "alert": next((event.kind for event in reversed(events) if event.target == name), "")})
-        next_floors[name] = {"signals": signals, "last_change": last_change.isoformat()}
+        next_floors[name] = {"signals": signals, "last_change": last_change.isoformat(),
+                             "status_last_change": status_last_change.isoformat()}
     return views, events, next_floors
 
 
@@ -483,12 +494,12 @@ def _render(template_path: Path, now: datetime, data_age: str, floors: list[dict
 
 def _paths(paths: dict[str, Path] | None) -> dict[str, Path | None]:
     home = Path.home()
-    repo = Path(__file__).resolve().parents[2]
-    runtime = home / "StudioProjects" / ".maestri" / "monitor"
+    project_root = Path(__file__).resolve().parent
+    runtime = project_root / "runtime"
     workspace_dir = home / ".maestri" / "workspaces"
-    marker_dir = home / "StudioProjects" / ".maestri" / "routine-andares"
+    marker_dir = runtime / "marcadores"
     result: dict[str, Path | None] = {
-        "repo": repo, "runtime": runtime,
+        "repo": None, "project_root": project_root, "runtime": runtime,
         "usage": home / ".maestri" / "usage" / "providers" / ".status.json",
         "workspace_dir": workspace_dir, "workspace": find_workspace_file(workspace_dir),
         "markers_dir": marker_dir, "config": DEFAULT_CONFIG, "template": DEFAULT_TEMPLATE,
@@ -527,10 +538,10 @@ def run_check(now: datetime | None = None, paths: dict[str, Path] | None = None,
     resolved = _paths(paths)
     runner = runner or subprocess.run
     runtime = resolved["runtime"]
-    repo = resolved["repo"]
     state_path = runtime / "state.json"
     panel_path = runtime / "painel.html"
     config = _read_json(resolved["config"]) or {}
+    repo = resolved["repo"] or Path(config.get("repo_produto", ""))
     config.setdefault("workspace_name", WORKSPACE_NAME)
     config.setdefault("markers_dir", str(resolved["markers_dir"]))
     old_state = _read_json(state_path)
@@ -542,13 +553,13 @@ def run_check(now: datetime | None = None, paths: dict[str, Path] | None = None,
         unavailable.append(workspace_error)
         payload = {"floors": [], "nodes": []}
     try:
-        runner(["git", "fetch", "origin", "dev"], cwd=str(repo), capture_output=True, text=True,
+        runner(["git", "-C", str(repo), "fetch", "origin", "dev"], cwd=str(repo), capture_output=True, text=True,
                encoding="utf-8", errors="replace", timeout=30)
     except (OSError, subprocess.SubprocessError):
         pass
     roadmap = None
     try:
-        result = runner(["git", "show", "origin/dev:docs/roadmap.md"], cwd=str(repo),
+        result = runner(["git", "-C", str(repo), "show", "origin/dev:docs/roadmap.md"], cwd=str(repo),
                         capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30)
         if result.returncode == 0 and isinstance(result.stdout, str):
             roadmap = parse_roadmap(result.stdout)

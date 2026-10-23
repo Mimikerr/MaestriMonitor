@@ -1,5 +1,6 @@
 {
   "workspace_name": "Smart-balança",
+  "repo_produto": "C:/Users/samuel.almeida/StudioProjects/softcom-balanca",
   "thresholds": {
     "warning": 75,
     "critical": 90,
