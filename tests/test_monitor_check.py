@@ -117,7 +117,7 @@ class MonitorCheckTests(unittest.TestCase):
         result = self.run_check()
         self.assertFalse(any(event.kind == "parado" for event in result.events))
         panel = (self.runtime / "painel.html").read_text(encoding="utf-8")
-        self.assertIn("Ground</td><td>working", panel)
+        self.assertIn('data-floor="Ground" data-state="working"', panel)
 
     def test_missing_status_floor_unchanged_for_30_minutes_is_stalled(self):
         self.set_roadmap("")
@@ -137,7 +137,7 @@ class MonitorCheckTests(unittest.TestCase):
         result = self.run_check()
         self.assertFalse(any(event.target == "Ground" for event in result.events))
         panel = (self.runtime / "painel.html").read_text(encoding="utf-8")
-        self.assertIn("Ground</td><td>ocioso", panel)
+        self.assertIn('data-floor="Ground" data-state="ocioso"', panel)
 
     def test_missing_status_floor_with_roadmap_reservation_is_working(self):
         self.set_roadmap("- [~] **R24 — Room v6 (Ground).** Em andamento (térreo).")
@@ -146,7 +146,7 @@ class MonitorCheckTests(unittest.TestCase):
         result = self.run_check()
         self.assertFalse(any(event.kind == "parado" for event in result.events))
         panel = (self.runtime / "painel.html").read_text(encoding="utf-8")
-        self.assertIn("Ground</td><td>working", panel)
+        self.assertIn('data-floor="Ground" data-state="working"', panel)
 
     def test_working_floor_only_stalls_at_30_minutes(self):
         self.set_roadmap("")
@@ -281,6 +281,52 @@ class MonitorCheckTests(unittest.TestCase):
         panel = (self.runtime / "painel.html").read_text(encoding="utf-8")
         self.assertIn("Antigravity (Pro)", panel)
         self.assertIn("94%", panel)
+
+    def test_panel_renders_accept_button_and_writes_proposals_file(self):
+        self.runner = lambda args, **kwargs: type("R", (), {"returncode": 0, "stdout": "- [ ] [abcd] R38 pronto", "stderr": ""})()
+        self.run_check()
+        panel = (self.runtime / "painel.html").read_text(encoding="utf-8")
+        self.assertIn('class="accept" data-item="R38"', panel)
+        saved = json.loads((self.runtime / "propostas.json").read_text(encoding="utf-8"))
+        self.assertIn("R38", [row["item"] for row in saved["proposals"]])
+
+    def test_panel_shows_dependencies_as_chips_and_rounds_usage(self):
+        self.set_roadmap("- [x] [a1] R16 pronto\n- [x] [a2] R18 pronto\n"
+                         "- [ ] **R34 — Exibir códigos.** Detalhe longo. Depende: R16, R18.")
+        status = {"providers": [{"name": "Antigravity", "plan": "Pro", "meters": [
+            {"windows": [{"id": "weekly", "ring": "weekly", "usedPercent": 93.8598,
+                          "resetsAt": "2026-10-23T21:00:00Z", "durationSeconds": 604800}]}
+        ]}]}
+        write_json(self.usage, status)
+        self.run_check()
+        panel = (self.runtime / "painel.html").read_text(encoding="utf-8")
+        self.assertNotIn("[&#x27;R16&#x27;", panel)
+        self.assertIn('<span class="chip mono">R16</span>', panel)
+        self.assertIn("94%", panel)
+        self.assertNotIn("93.8598%", panel)
+        self.assertIn("reset em 4 h", panel)
+
+    def test_alert_strip_lists_active_events_and_empty_state(self):
+        self.set_roadmap("")
+        self.run_check()
+        panel = (self.runtime / "painel.html").read_text(encoding="utf-8")
+        self.assertIn("Nenhum alerta ativo", panel)
+        status = {"providers": [{"name": "Claude Code", "plan": "Pro", "meters": [
+            {"windows": [{"id": "weekly", "ring": "weekly", "usedPercent": 91,
+                          "resetsAt": "2026-10-25T00:00:00Z", "durationSeconds": 604800}]}
+        ]}]}
+        write_json(self.usage, status)
+        self.run_check()
+        panel = (self.runtime / "painel.html").read_text(encoding="utf-8")
+        self.assertNotIn("Nenhum alerta ativo", panel)
+        self.assertIn("Conta crítica", panel)
+        self.assertIn("1 crítica", panel)
+
+    def test_relative_time_labels(self):
+        self.assertEqual(monitor._relative("2026-10-14T15:23:21Z", NOW), "há 9 dias")
+        self.assertEqual(monitor._relative("2026-10-23T19:53:00Z", NOW), "em 2 h 53 min")
+        self.assertEqual(monitor._relative("2026-10-25T20:00:00Z", NOW), "em 2 d 3 h")
+        self.assertEqual(monitor._relative("indisponível", NOW), "indisponível")
 
     def test_unreadable_roadmap_keeps_panel_and_marks_source_unavailable(self):
         self.runner = lambda *args, **kwargs: (_ for _ in ()).throw(OSError("unavailable"))

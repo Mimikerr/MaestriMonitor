@@ -6,47 +6,176 @@
   <meta http-equiv="refresh" content="60">
   <title>Monitor dos andares</title>
   <style>
-    :root { color-scheme: light dark; --bg:#f4f6f8; --card:#fff; --fg:#18212b; --muted:#637083; --line:#d8dee6; --accent:#315fce; --ok:#22834b; --warn:#a25b00; --critical:#bb2430; }
-    @media (prefers-color-scheme: dark) { :root { --bg:#121820; --card:#1c2631; --fg:#e8edf3; --muted:#a7b3c1; --line:#354250; --accent:#8aa9ff; --ok:#65ce8c; --warn:#ffc06b; --critical:#ff7880; } }
-    * { box-sizing:border-box; } body { margin:0; padding:20px; background:var(--bg); color:var(--fg); font:15px/1.45 system-ui,sans-serif; }
-    main { max-width:1400px; margin:auto; } h1 { margin:0 0 4px; font-size:1.6rem; } .meta { color:var(--muted); margin-bottom:18px; }
-    nav { display:flex; flex-wrap:wrap; gap:8px; margin:14px 0; } button { border:1px solid var(--line); border-radius:8px; padding:9px 13px; background:var(--card); color:var(--fg); cursor:pointer; } button[aria-selected="true"] { background:var(--accent); color:#fff; border-color:var(--accent); }
-    section[role="tabpanel"] { display:none; background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; overflow:auto; } section[role="tabpanel"].active { display:block; }
-    .source { color:var(--muted); margin:8px 0 14px; } .counts { color:var(--muted); margin:8px 0 14px; }
-    table { width:100%; border-collapse:collapse; min-width:650px; } th,td { text-align:left; vertical-align:top; padding:10px 9px; border-bottom:1px solid var(--line); } th { color:var(--muted); font-size:.88rem; }
-    .bar { display:inline-block; width:min(160px,25vw); height:10px; border-radius:8px; background:var(--line); overflow:hidden; vertical-align:middle; } .bar i { display:block; height:100%; background:var(--ok); } .AVISO .bar i { background:var(--warn); } .CRITICO .bar i { background:var(--critical); }
-    @media (max-width:600px) { body { padding:12px; } section[role="tabpanel"] { padding:11px; } h1 { font-size:1.35rem; } }
+    :root { color-scheme: light dark;
+      --bg:#f2f4f7; --surface:#fff; --surface2:#f7f8fa; --fg:#101828; --muted:#556070; --line:#e3e7ed; --track:#e6e9ee; --accent:#2e5bd8; --accent-fg:#fff; --shadow:0 1px 2px rgba(16,24,40,.12);
+      --ok:#17703f; --ok-bg:#e4f4ea; --ok-bar:#2e9e5b; --warn:#8a4b00; --warn-bg:#fff0d9; --warn-bar:#d98a12; --crit:#b42318; --crit-bg:#fde8e6; --crit-bar:#d64535;
+      --info:#2648b8; --info-bg:#e8eefd; --neutral:#4a5565; --neutral-bg:#edf0f3; --neutral-bar:#556070; }
+    @media (prefers-color-scheme: dark) { :root {
+      --bg:#0d1218; --surface:#151c25; --surface2:#1b2430; --fg:#e7ecf2; --muted:#9ba7b6; --line:#283341; --track:#263040; --accent:#8ea8ff; --accent-fg:#0d1218; --shadow:0 1px 2px rgba(0,0,0,.5);
+      --ok:#63d18f; --ok-bg:#12301f; --ok-bar:#4cbf7c; --warn:#f5b85c; --warn-bg:#3a2a10; --warn-bar:#e9a23b; --crit:#ff8c86; --crit-bg:#3d1715; --crit-bar:#f0645b;
+      --info:#a9bcff; --info-bg:#1c2645; --neutral:#b5c0cc; --neutral-bg:#222c38; --neutral-bar:#9ba7b6; } }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.45 "Segoe UI Variable Text","Segoe UI",system-ui,sans-serif; }
+    main { max-width:1400px; margin:0 auto; padding:24px clamp(16px,3vw,32px) 40px; display:flex; flex-direction:column; gap:18px; }
+    .mono { font-family:"Cascadia Mono",Consolas,ui-monospace,monospace; }
+    .muted { color:var(--muted); }
+    header { display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space-between; gap:12px 24px; }
+    .eyebrow { font-size:12px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
+    h1 { margin:0; font-size:26px; line-height:1.2; }
+    h2 { margin:0; font-size:19px; line-height:1.25; }
+    .meta { display:flex; flex-wrap:wrap; align-items:center; gap:8px; font-size:13px; color:var(--muted); }
+    .source { display:inline-flex; align-items:center; gap:6px; padding:4px 10px; border-radius:999px; font-size:12px; background:var(--surface); border:1px solid var(--line); }
+    .source.down { color:var(--crit); }
+    .dot { width:7px; height:7px; border-radius:50%; background:var(--ok-bar); flex:none; }
+    .source.down .dot { background:var(--crit-bar); }
+    .alerts { background:var(--surface); border:1px solid var(--line); border-radius:14px; overflow:hidden; }
+    .alert { display:flex; flex-wrap:wrap; align-items:center; gap:10px 14px; padding:12px 16px; border-top:1px solid var(--line); }
+    .alert:first-child { border-top:0; }
+    .alert .icon { display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; border-radius:8px; }
+    .alert .detail { color:var(--muted); flex:1 1 220px; }
+    .alert.none { color:var(--muted); }
+    .badge { display:inline-flex; align-items:center; gap:6px; padding:3px 10px; border-radius:999px; font-size:12px; font-weight:600; white-space:nowrap; }
+    .badge.strong { font-weight:700; padding:4px 11px; }
+    .badge.strong::before { content:""; width:7px; height:7px; border-radius:50%; background:currentColor; }
+    .ok { --tone:var(--ok); --tone-bg:var(--ok-bg); --tone-bar:var(--ok-bar); }
+    .warn { --tone:var(--warn); --tone-bg:var(--warn-bg); --tone-bar:var(--warn-bar); }
+    .crit { --tone:var(--crit); --tone-bg:var(--crit-bg); --tone-bar:var(--crit-bar); }
+    .info { --tone:var(--info); --tone-bg:var(--info-bg); --tone-bar:var(--accent); }
+    .neutral { --tone:var(--neutral); --tone-bg:var(--neutral-bg); --tone-bar:var(--neutral-bar); }
+    .badge, .alert .icon, .callout { color:var(--tone); background:var(--tone-bg); }
+    nav { display:flex; flex-wrap:wrap; gap:6px; padding:4px; border-radius:12px; background:var(--surface2); border:1px solid var(--line); align-self:flex-start; max-width:100%; }
+    nav button { display:inline-flex; align-items:center; gap:8px; min-height:40px; padding:0 14px; border-radius:9px; border:0; font:inherit; font-size:14px; font-weight:600; cursor:pointer; background:transparent; color:var(--muted); }
+    nav button[aria-selected="true"] { background:var(--surface); color:var(--fg); box-shadow:var(--shadow); }
+    section[role="tabpanel"] { display:none; flex-direction:column; gap:14px; }
+    section[role="tabpanel"].active { display:flex; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); gap:16px; }
+    .card { background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:18px 20px; display:flex; flex-direction:column; gap:14px; min-width:0; }
+    .card.warn { border-color:var(--warn); } .card.crit { border-color:var(--crit); }
+    .card-head { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+    .card-head > div { display:flex; flex-direction:column; min-width:0; }
+    .sub, .label { font-size:12px; color:var(--muted); }
+    .label { font-weight:600; }
+    .clamp { margin:4px 0 0; font-size:14px; line-height:1.5; min-height:63px; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; overflow-wrap:anywhere; }
+    .callout { display:flex; align-items:center; gap:8px; padding:8px 12px; border-radius:10px; font-size:13px; font-weight:600; }
+    .facts { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px 16px; margin:0; padding-top:14px; border-top:1px solid var(--line); }
+    .facts div { display:flex; flex-direction:column; gap:2px; min-width:0; }
+    .facts dt { font-size:12px; color:var(--muted); }
+    .facts dd { margin:0; font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .facts dd.big { font-size:20px; font-weight:700; line-height:1.2; }
+    .facts dd.big.warn, .facts dd.big.crit { color:var(--tone); }
+    .term { display:flex; align-items:center; gap:6px; }
+    .term .dot.off { background:var(--muted); }
+    .filters { display:flex; flex-wrap:wrap; gap:8px; }
+    .filters button { display:inline-flex; align-items:center; gap:10px; min-height:44px; padding:0 14px; border-radius:10px; font:inherit; font-size:14px; cursor:pointer; background:var(--surface2); color:var(--fg); border:1px solid var(--line); }
+    .filters button[aria-pressed="true"] { background:var(--surface); border-color:var(--accent); }
+    .filters strong { font-size:18px; color:var(--tone,var(--fg)); }
+    .table-box { background:var(--surface); border:1px solid var(--line); border-radius:14px; overflow-x:auto; }
+    table { width:100%; min-width:560px; border-collapse:collapse; font-size:14px; }
+    th, td { text-align:left; vertical-align:top; padding:12px 16px; border-bottom:1px solid var(--line); }
+    tbody tr:last-child td { border-bottom:0; }
+    th { color:var(--muted); font-size:12px; font-weight:600; }
+    td.id { font-weight:600; width:70px; }
+    th:nth-child(2) { width:150px; } th:last-child { width:260px; }
+    td .sub { display:block; margin-top:4px; }
+    .note { font-size:13px; margin-top:4px; color:var(--crit); }
+    .chips { display:flex; flex-wrap:wrap; align-items:center; gap:4px; }
+    .chip { display:inline-flex; padding:1px 8px; border-radius:6px; font-size:12px; color:var(--fg); background:var(--surface2); border:1px solid var(--line); }
+    tr[hidden] { display:none; }
+    .proposal-title { display:flex; gap:10px; align-items:baseline; }
+    .proposal-title .mono { font-size:18px; font-weight:700; color:var(--accent); }
+    .proposal-title h2 { font-size:16px; line-height:1.35; font-weight:600; }
+    .actions { display:flex; align-items:center; gap:10px; margin-top:auto; padding-top:12px; border-top:1px solid var(--line); }
+    button.accept { min-height:44px; padding:0 18px; border-radius:10px; font:inherit; font-size:14px; font-weight:700; cursor:pointer; background:var(--accent); color:var(--accent-fg); border:1px solid var(--accent); }
+    button.accept:disabled { opacity:.55; cursor:default; }
+    button.accept.confirm { background:var(--warn-bar); border-color:var(--warn-bar); color:#fff; opacity:1; }
+    .empty { padding:32px; text-align:center; border:1px dashed var(--line); border-radius:14px; color:var(--muted); }
+    .banner { display:flex; flex-wrap:wrap; align-items:center; gap:8px 12px; padding:12px 16px; border-radius:12px; background:var(--info-bg); color:var(--info); font-size:14px; }
+    .meter { display:flex; flex-direction:column; gap:6px; }
+    .meter-head { display:flex; align-items:baseline; justify-content:space-between; gap:8px; font-size:13px; font-weight:600; }
+    .meter-head strong { font-size:20px; }
+    .meter-head strong.warn, .meter-head strong.crit { color:var(--tone); }
+    .track { height:8px; border-radius:999px; background:var(--track); overflow:hidden; }
+    .track i { display:block; height:100%; border-radius:999px; background:var(--tone-bar); }
+    .meter-foot { display:flex; flex-wrap:wrap; justify-content:space-between; gap:4px 12px; font-size:12px; color:var(--muted); }
+    .meter-foot .hot { color:var(--warn); font-weight:700; }
+    #accept-note { margin:0; font-size:14px; color:var(--muted); }
   </style>
 </head>
 <body>
 <main>
-  <h1>Monitor dos andares</h1>
-  <div class="meta">Atualizado em <time>{{UPDATED_AT}}</time> · dados: {{DATA_AGE}}</div>
+  <header>
+    <div>
+      <div class="eyebrow">Smart Balança · {{FLOOR_COUNT}} andares</div>
+      <h1>Monitor dos andares</h1>
+    </div>
+    <div class="meta">
+      <span>Atualizado às <time datetime="{{UPDATED_AT_ISO}}">{{UPDATED_AT}}</time> · recarrega a cada 60 s</span>
+      {{SOURCE_CHIPS}}
+    </div>
+  </header>
+  <section class="alerts" aria-label="Alertas ativos">{{ALERT_STRIP}}</section>
   <nav role="tablist" aria-label="Seções do painel">
-    <button role="tab" aria-selected="true" aria-controls="floors">Andares</button>
-    <button role="tab" aria-selected="false" aria-controls="demands">Demandas</button>
-    <button role="tab" aria-selected="false" aria-controls="proposals">Propostos</button>
-    <button role="tab" aria-selected="false" aria-controls="accounts">Limites das contas</button>
+    <button role="tab" aria-selected="true" aria-controls="floors">Andares {{TAB_FLOORS}}</button>
+    <button role="tab" aria-selected="false" aria-controls="demands">Demandas {{TAB_DEMANDS}}</button>
+    <button role="tab" aria-selected="false" aria-controls="proposals">Propostos {{TAB_PROPOSALS}}</button>
+    <button role="tab" aria-selected="false" aria-controls="accounts">Limites das contas {{TAB_ACCOUNTS}}</button>
   </nav>
-  <section id="floors" role="tabpanel" class="active">
-    <p class="source">Fonte: {{SOURCE_STATUS}}</p>
-    <table><thead><tr><th>Andar</th><th>Estado</th><th>Item/status atual</th><th>Terminal</th><th>Terminal ativo</th><th>Última atividade</th><th>Min sem mudança</th><th>Alerta</th><th>HEAD</th></tr></thead><tbody>{{FLOOR_ROWS}}</tbody></table>
-    <h2>Eventos ativos</h2><table><thead><tr><th>Tipo</th><th>Alvo</th><th>Detalhe</th></tr></thead><tbody>{{EVENT_ROWS}}</tbody></table>
+  <section id="floors" role="tabpanel" class="active" aria-label="Andares">
+    <div class="grid">{{FLOOR_CARDS}}</div>
   </section>
-  <section id="demands" role="tabpanel">
-    <p class="counts">{{ROADMAP_COUNTS}}</p>
-    <table><thead><tr><th>Item</th><th>Estado</th><th>Demanda</th><th>Dependências</th></tr></thead><tbody>{{DEMAND_ROWS}}</tbody></table>
+  <section id="demands" role="tabpanel" aria-label="Demandas">
+    <div class="filters">{{DEMAND_FILTERS}}</div>
+    <div class="table-box"><table><thead><tr><th>Item</th><th>Estado</th><th>Demanda</th><th>Depende de</th></tr></thead><tbody>{{DEMAND_ROWS}}</tbody></table></div>
   </section>
-  <section id="proposals" role="tabpanel">
-    <table><thead><tr><th>Andar</th><th>Item</th><th>Dependências</th><th>Motivo</th><th>Risco de conflito</th></tr></thead><tbody>{{PROPOSAL_ROWS}}</tbody></table>
+  <section id="proposals" role="tabpanel" aria-label="Propostos">
+    <p id="accept-note">Próximo item desbloqueado por andar. Aceitar envia a demanda ao orquestrador; disponível ao abrir o painel pelo servidor local.</p>
+    {{PROPOSAL_CARDS}}
   </section>
-  <section id="accounts" role="tabpanel">
-    <table><thead><tr><th>Conta</th><th>Janela</th><th>Uso</th><th>Nível</th><th>Reset</th><th>Ritmo</th><th>Recomendação</th></tr></thead><tbody>{{ACCOUNT_ROWS}}</tbody></table>
+  <section id="accounts" role="tabpanel" aria-label="Limites das contas">
+    {{ACCOUNT_CARDS}}
   </section>
 </main>
 <script>
+  const store={get:k=>{try{return sessionStorage.getItem(k);}catch(e){return null;}},set:(k,v)=>{try{sessionStorage.setItem(k,v);}catch(e){}}};
   const tabs=[...document.querySelectorAll('[role="tab"]')];
-  tabs.forEach(tab=>tab.addEventListener('click',()=>{tabs.forEach(item=>item.setAttribute('aria-selected',String(item===tab)));document.querySelectorAll('[role="tabpanel"]').forEach(panel=>panel.classList.toggle('active',panel.id===tab.getAttribute('aria-controls')))}));
+  const selectTab=id=>{if(!document.getElementById(id))return;tabs.forEach(item=>item.setAttribute('aria-selected',String(item.getAttribute('aria-controls')===id)));document.querySelectorAll('[role="tabpanel"]').forEach(panel=>panel.classList.toggle('active',panel.id===id));store.set('painel-aba',id);};
+  tabs.forEach(tab=>tab.addEventListener('click',()=>selectTab(tab.getAttribute('aria-controls'))));
+  selectTab(store.get('painel-aba')||'floors');
+
+  const filters=[...document.querySelectorAll('.filters button')];
+  const applyFilter=group=>{filters.forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.filter===group)));document.querySelectorAll('#demands tbody tr[data-group]').forEach(row=>{row.hidden=group!=='todos'&&row.dataset.group!==group;});store.set('painel-filtro',group);};
+  filters.forEach(b=>b.addEventListener('click',()=>applyFilter(b.dataset.filter)));
+  applyFilter(store.get('painel-filtro')||'todos');
+
+  (async()=>{
+    const buttons=[...document.querySelectorAll('button.accept')],note=document.getElementById('accept-note');
+    if(location.protocol!=='http:'||!buttons.length)return;
+    const label=(button,text,disabled)=>{button.textContent=text;button.disabled=disabled;button.classList.remove('confirm');};
+    try{
+      const sent=await (await fetch('/aceitas',{cache:'no-store'})).json();
+      buttons.forEach(button=>{
+        const row=sent[button.dataset.item];
+        if(row&&row.status==='falhou'){button.disabled=false;button.title=row.detail||'';button.textContent='Tentar de novo';}
+        else if(row){label(button,row.status==='enviado'?'Enviado':'Enviando…',true);}
+        else button.disabled=false;
+      });
+      if(note)note.textContent='Próximo item desbloqueado por andar. Aceitar envia a demanda ao orquestrador; confirme com um segundo clique.';
+    }catch(error){return;}
+    buttons.forEach(button=>{
+      let timer=null;
+      button.addEventListener('click',async()=>{
+        if(!button.classList.contains('confirm')){
+          button.classList.add('confirm');button.textContent='Confirmar envio';
+          timer=setTimeout(()=>{button.classList.remove('confirm');button.textContent='Aceitar';},4000);return;
+        }
+        clearTimeout(timer);label(button,'Enviando…',true);
+        try{
+          const response=await fetch('/aceitar',{method:'POST',headers:{'Content-Type':'application/json','X-Painel':'1'},body:JSON.stringify({item:button.dataset.item,floor:button.dataset.floor})});
+          if(!response.ok){const body=await response.json();label(button,'Aceitar',false);button.title=body.erro||'';if(note)note.textContent='Não enviado: '+(body.erro||response.status);}
+        }catch(error){label(button,'Aceitar',false);if(note)note.textContent='Servidor local indisponível.';}
+      });
+    });
+  })();
 </script>
 </body>
 </html>

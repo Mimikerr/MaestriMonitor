@@ -7,38 +7,122 @@
     "stalled_minutes": 30,
     "reminder_minutes": 120
   },
-  "contas_vigiadas": ["Claude Code", "Codex", "Squad IA"],
+  "contas_vigiadas": [
+    "Claude Code",
+    "Codex",
+    "Squad IA"
+  ],
   "floors": [
     {
       "name": "Ground",
       "branch": "dev",
-      "track": ["R23", "R24", "R25", "R26", "R27", "R28", "R55", "R51"]
+      "track": [
+        "R23",
+        "R24",
+        "R25",
+        "R26",
+        "R27",
+        "R28",
+        "R55",
+        "R51",
+        "R30"
+      ],
+      "orquestrador": "Orquestrador Terreo"
     },
     {
       "name": "Dev 2",
       "branch": "dev-home",
-      "track": ["R29", "R30", "R49"]
+      "track": [
+        "R29",
+        "R49"
+      ],
+      "orquestrador": "Orquestrador 2"
     },
     {
       "name": "Dev 3",
       "branch": "dev-3",
-      "track": ["R38", "R39", "R40", "R41"]
+      "track": [
+        "R38",
+        "R39",
+        "R40",
+        "R41"
+      ],
+      "orquestrador": "Orquestrador 3"
     }
   ],
   "items": {
-    "R06": {"risks": ["baseline"]},
-    "R08": {"risks": ["baseline"]},
-    "R20": {"risks": ["schema"]},
-    "R24": {"risks": ["schema"]},
-    "R28": {"risks": ["container"]},
-    "R31": {"risks": ["schema", "container"]},
-    "R32": {"risks": ["container"]},
-    "R33": {"risks": ["schema"]},
-    "R38": {"risks": ["container"]},
-    "R39": {"risks": ["container"]},
-    "R40": {"risks": ["container"]},
-    "R41": {"risks": ["container"]},
-    "R42": {"risks": ["container"]},
-    "R43": {"risks": ["container"]}
-  }
+    "R06": {
+      "risks": [
+        "baseline"
+      ]
+    },
+    "R08": {
+      "risks": [
+        "baseline"
+      ]
+    },
+    "R20": {
+      "risks": [
+        "schema"
+      ]
+    },
+    "R24": {
+      "risks": [
+        "schema"
+      ]
+    },
+    "R28": {
+      "risks": [
+        "container"
+      ]
+    },
+    "R31": {
+      "risks": [
+        "schema",
+        "container"
+      ]
+    },
+    "R32": {
+      "risks": [
+        "container"
+      ]
+    },
+    "R33": {
+      "risks": [
+        "schema"
+      ]
+    },
+    "R38": {
+      "risks": [
+        "container"
+      ]
+    },
+    "R39": {
+      "risks": [
+        "container"
+      ]
+    },
+    "R40": {
+      "risks": [
+        "container"
+      ]
+    },
+    "R41": {
+      "risks": [
+        "container"
+      ]
+    },
+    "R42": {
+      "risks": [
+        "container"
+      ]
+    },
+    "R43": {
+      "risks": [
+        "container"
+      ]
+    }
+  },
+  "remetente": "Claude Code #4 | Monitor de Andares",
+  "painel_porta": 8765
 }

@@ -435,57 +435,219 @@ def _escape(value: Any) -> str:
     return html.escape(str(value), quote=True)
 
 
-def _render(template_path: Path, now: datetime, data_age: str, floors: list[dict[str, Any]],
+FLOOR_STATES = {"working": ("Trabalhando", "ok"), "ocioso": ("Ocioso", "neutral"), "parado": ("Parado", "warn"),
+                "blocked": ("Bloqueado", "crit"), "review": ("Em review", "info")}
+FLOOR_ALERTS = {"parado": ("Parado", "warn"), "travado": ("Travado", "crit"), "review": ("Em review", "info")}
+TERMINAL_STATES = {"stopped": "parado", "restored": "restaurado", "running": "rodando", "idle": "ocioso"}
+EVENT_LABELS = {"parado": "Parado", "travado": "Travado", "review": "Review", "conta_aviso": "Conta em aviso",
+                "conta_critica": "Conta crítica", "ritmo": "Ritmo"}
+LEVEL_TONES = {"OK": "ok", "AVISO": "warn", "CRITICO": "crit"}
+DEMAND_STATES = {"reserved": ("Reservado", "info", "andamento"), "working": ("Em andamento", "info", "andamento"),
+                 "todo": ("A fazer", "neutral", "todo"), "blocked": ("Bloqueado", "crit", "blocked"),
+                 "done": ("Feito", "ok", "done")}
+DEMAND_FILTERS = (("todos", "Todos", ""), ("andamento", "Em andamento", "info"), ("todo", "A fazer", "neutral"),
+                  ("blocked", "Bloqueados", "crit"), ("done", "Feitos", "ok"))
+RING_LABELS = {"session": "Sessão", "weekly": "Semanal", "special": "Especial"}
+ALERT_ICON = ('<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" '
+              'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 2 21h20L12 3z"/>'
+              '<path d="M12 10v5"/><path d="M12 18h.01"/></svg>')
+CHECK_ICON = ('<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" '
+              'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>')
+
+
+def _relative(value: Any, now: datetime) -> str:
+    moment = _parse_time(value)
+    if moment is None:
+        return str(value)
+    seconds = int((moment - now).total_seconds())
+    future = seconds > 0
+    minutes = abs(seconds) // 60
+    if minutes == 0:
+        return "agora"
+    if minutes < 60:
+        text = f"{minutes} min"
+    elif minutes < 1440:
+        hours, rest = divmod(minutes, 60)
+        text = f"{hours} h {rest} min" if future and rest else f"{hours} h"
+    else:
+        days, rest = divmod(minutes, 1440)
+        if future:
+            text = f"{days} d {rest // 60} h" if rest // 60 else f"{days} d"
+        else:
+            text = "1 dia" if days == 1 else f"{days} dias"
+    return ("em " if future else "há ") + text
+
+
+def _badge(text: str, tone: str, strong: bool = False) -> str:
+    return f'<span class="badge {tone}{" strong" if strong else ""}">{_escape(text)}</span>'
+
+
+def _chips(deps: list[str]) -> str:
+    if not deps:
+        return '<span class="muted">—</span>'
+    return '<div class="chips">' + "".join(f'<span class="chip mono">{_escape(dep)}</span>' for dep in deps) + "</div>"
+
+
+def _event_target(target: str) -> str:
+    head, _, ring = target.rpartition(" ")
+    return f"{head} · {RING_LABELS[ring.lower()].lower()}" if head and ring.lower() in RING_LABELS else target
+
+
+def _demand_title(title: str) -> str:
+    return title.split("**", 1)[0].strip().replace("`", "")
+
+
+def _floor_card(floor: dict[str, Any], events: list[Event], now: datetime) -> str:
+    name = str(floor.get("floor", ""))
+    state = str(floor.get("state", ""))
+    label, tone = FLOOR_STATES.get(state, (state.capitalize() or "Indisponível", "warn"))
+    event = next((item for item in events if item.target == name and item.kind in FLOOR_ALERTS), None)
+    if event:
+        label, tone = FLOOR_ALERTS[event.kind]
+    card_tone = tone if tone in ("warn", "crit") else ""
+    terminal_status = str(floor.get("terminal_status", ""))
+    terminal_label = TERMINAL_STATES.get(terminal_status, terminal_status)
+    head = str(floor.get("head", ""))
+    short_head = head[:7] if re.fullmatch(r"[0-9a-f]{7,40}", head) else head
+    last_active = floor.get("last_active", "")
+    callout = (f'<div class="callout {tone}">{ALERT_ICON}{_escape(event.detail)}</div>' if event else "")
+    return (
+        f'<article class="card floor {card_tone}" data-floor="{_escape(name)}" data-state="{_escape(state)}">'
+        f'<div class="card-head"><div><h2>{_escape(name)}</h2><span class="sub">branch {_escape(floor.get("branch") or "—")}</span></div>'
+        f'{_badge(label, tone, strong=True)}</div>'
+        f'<div><span class="label">Item / status atual</span><p class="clamp" title="{_escape(floor.get("text", ""))}">'
+        f'{_escape(floor.get("text", ""))}</p></div>{callout}'
+        '<dl class="facts">'
+        f'<div><dt>Terminal</dt><dd class="term" title="{_escape(floor.get("terminal", ""))}">'
+        f'<span class="dot{"" if terminal_status in ("restored", "running") else " off"}"></span>{_escape(floor.get("terminal", ""))}</dd>'
+        f'<dd class="sub">terminal {_escape(terminal_label)}</dd></div>'
+        f'<div><dt>Sem mudança</dt><dd class="big {card_tone}">{_escape(floor.get("idle_minutes", 0))} min</dd></div>'
+        f'<div><dt>Última atividade do terminal</dt><dd title="{_escape(last_active)}">{_escape(_relative(last_active, now))}</dd></div>'
+        f'<div><dt>HEAD</dt><dd class="mono" title="{_escape(head)}">{_escape(short_head)}</dd></div>'
+        "</dl></article>"
+    )
+
+
+def _account_card(account: dict[str, Any], now: datetime) -> str:
+    worst = "ok"
+    meters = []
+    for window in account.get("windows", []):
+        used = max(0.0, min(100.0, _number(window.get("used"))))
+        tone = LEVEL_TONES.get(str(window.get("level")), "ok")
+        projection = window.get("projection")
+        hot = projection is not None and projection > 100 and used >= 40
+        if tone == "crit":
+            worst = "crit"
+        elif (tone == "warn" or hot) and worst != "crit":
+            worst = "warn"
+        ring = str(window.get("ring", ""))
+        name = RING_LABELS.get(ring.lower(), ring)
+        rhythm = f"ritmo projeta {projection:.0f}%" if projection is not None else "ritmo indisponível"
+        meters.append(
+            f'<div class="meter {tone}"><div class="meter-head"><span>{_escape(name)}</span>'
+            f'<strong class="{tone}">{used:.0f}%</strong></div>'
+            f'<div class="track" role="img" aria-label="{_escape(name)}: {used:.0f}% usado"><i style="width:{used:.1f}%"></i></div>'
+            f'<div class="meter-foot"><span title="{_escape(window.get("reset", ""))}">reset {_escape(_relative(window.get("reset"), now))}</span>'
+            f'<span class="{"hot" if hot else ""}">{_escape(rhythm)}</span></div></div>'
+        )
+    level = {"crit": "Crítico", "warn": "Aviso", "ok": "OK"}[worst]
+    sub = "vigiada" if account.get("watched") else "informativa · não dispara troca"
+    return (f'<article class="card {worst if worst != "ok" else ""}"><div class="card-head"><div>'
+            f'<h2>{_escape(account.get("account", ""))}</h2><span class="sub">{sub}</span></div>'
+            f'{_badge(level, worst)}</div>{"".join(meters) or "<p class=muted>Sem janelas de uso.</p>"}</article>')
+
+
+def _render(template_path: Path, now: datetime, sources: list[tuple[str, str, bool]], floors: list[dict[str, Any]],
             roadmap: dict[str, dict[str, Any]] | None, proposals: list[dict[str, Any]],
             accounts: list[dict[str, Any]], unavailable: list[str], events: list[Event]) -> str:
     template = template_path.read_text(encoding="utf-8")
-    def rows(items: list[dict[str, Any]], columns: list[tuple[str, str]]) -> str:
-        output = []
-        for item in items:
-            output.append("<tr>" + "".join(f"<td>{_escape(item.get(key, ''))}</td>" for key, _ in columns) + "</tr>")
-        return "\n".join(output) or f'<tr><td colspan="{len(columns)}">Sem dados</td></tr>'
-    floor_html = rows(floors, [("floor", "Andar"), ("state", "Estado"), ("text", "Item/status atual"),
-                               ("terminal", "Terminal"), ("terminal_status", "Terminal ativo"),
-                               ("last_active", "Última atividade"), ("idle_minutes", "Min sem mudança"),
-                               ("alert", "Alerta"), ("head", "HEAD")])
+    source_html = "".join(
+        f'<span class="source{"" if ok else " down"}" title="{"fonte disponível" if ok else "fonte indisponível neste ciclo"}">'
+        f'<span class="dot"></span>{_escape(label)} · {_escape(age)}</span>' for label, age, ok in sources)
+    source_html += "".join(f'<span class="source down"><span class="dot"></span>{_escape(item)}</span>'
+                           for item in unavailable if item == "template indisponível")
+    ordered = sorted(events, key=lambda item: -LEVEL_RANK.get(item.level, 0))
+    alert_html = "".join(
+        f'<div class="alert"><span class="icon {LEVEL_TONES.get(event.level, "warn")}">{ALERT_ICON}</span>'
+        f'{_badge(EVENT_LABELS.get(event.kind, event.kind), LEVEL_TONES.get(event.level, "warn"))}'
+        f'<strong>{_escape(_event_target(event.target))}</strong><span class="detail">{_escape(event.detail)}</span></div>'
+        for event in ordered
+    ) or (f'<div class="alert none"><span class="icon ok">{CHECK_ICON}</span>Nenhum alerta ativo. O Monitor avisa quando '
+          'um andar para, trava ou uma conta passa de 75%.</div>')
+    floor_html = "".join(_floor_card(floor, events, now) for floor in floors) or '<div class="empty">Sem andares configurados.</div>'
+
+    rows = roadmap or {}
+    groups: dict[str, int] = {"todos": len(rows)}
     demand_rows = []
-    if roadmap is not None:
-        demand_rows = [{"item": item_id, "state": item["state"], "title": item["title"],
-                        "deps": ", ".join(item["deps"])} for item_id, item in roadmap.items()]
-    demand_html = rows(demand_rows, [("item", "Item"), ("state", "Estado"), ("title", "Demanda"), ("deps", "Dependências")])
-    proposal_html = rows(proposals, [("floor", "Andar"), ("item", "Item"), ("deps", "Dependências"),
-                                    ("reason", "Motivo"), ("risk", "Risco")])
-    account_rows = []
-    for account in accounts:
-        for window in account["windows"]:
-            amount = window["used"]
-            level = window["level"]
-            account_rows.append({"account": account["account"], "ring": window["ring"], "used": amount,
-                                 "level": level, "reset": window["reset"],
-                                 "projection": f"{window['projection']:.0f}%" if window["projection"] is not None else "indisponível",
-                                 "recommendation": account["recommendation"]})
-    account_html = "\n".join(
-        f'<tr class="{_escape(row["level"])}"><td>{_escape(row["account"])}</td>'
-        f'<td>{_escape(row["ring"])}</td><td><span class="bar" aria-label="{row["used"]:g}%">'
-        f'<i style="width:{max(0, min(100, row["used"])):g}%"></i></span> {row["used"]:g}%</td>'
-        f'<td>{_escape(row["level"])}</td><td>{_escape(row["reset"])}</td>'
-        f'<td>{_escape(row["projection"])}</td><td>{_escape(row["recommendation"])}</td></tr>'
-        for row in account_rows
-    ) or '<tr><td colspan="7">Sem dados</td></tr>'
-    availability = "; ".join(unavailable) if unavailable else "todas as fontes principais disponíveis"
-    event_html = rows([{"kind": event.kind, "target": event.target, "detail": event.detail} for event in events],
-                      [("kind", "Tipo"), ("target", "Alvo"), ("detail", "Detalhe")])
-    counts = roadmap or {}
+    for item_id, item in rows.items():
+        label, tone, group = DEMAND_STATES.get(item["state"], (item["state"], "neutral", "todo"))
+        groups[group] = groups.get(group, 0) + 1
+        title = item.get("title", "")
+        floor_match = re.search(r"Em andamento \(([^)]+)\)", title)
+        floor_note = f'<span class="sub">{_escape(floor_match.group(1))}</span>' if floor_match and group == "andamento" else ""
+        block = re.search(r"Bloqueio:\s*(.+?)\s*(?:Em andamento \([^)]*\)\.?)?$", title)
+        note = (f'<div class="note">Bloqueio: {_escape(block.group(1))}</div>'
+                if block and item["state"] == "blocked" and block.group(1).strip() not in ("—", "-") else "")
+        demand_rows.append(
+            f'<tr data-group="{group}"><td class="id mono">{_escape(item_id)}</td><td>{_badge(label, tone)}{floor_note}</td>'
+            f'<td><div title="{_escape(title)}">{_escape(_demand_title(title))}</div>{note}</td><td>{_chips(item.get("deps", []))}</td></tr>')
+    demand_html = "".join(demand_rows) or (
+        '<tr><td colspan="4" class="muted">Roadmap indisponível neste ciclo.</td></tr>' if roadmap is None
+        else '<tr><td colspan="4" class="muted">Sem itens no roadmap.</td></tr>')
+    filter_html = "".join(
+        f'<button type="button" class="{tone}" data-filter="{key}" aria-pressed="{"true" if key == "todos" else "false"}">'
+        f'<strong>{groups.get(key, 0)}</strong>{label}</button>' for key, label, tone in DEMAND_FILTERS)
+
+    proposal_cards = []
+    for item in proposals:
+        if not item.get("item"):
+            proposal_cards.append(
+                f'<article class="card"><div class="card-head"><span class="label">{_escape(item.get("floor", ""))}</span></div>'
+                f'<p class="muted">{_escape(item.get("reason", "nenhum item desbloqueado"))}</p></article>')
+            continue
+        risk = str(item.get("risk", "baixo"))
+        proposal_cards.append(
+            f'<article class="card"><div class="card-head"><span class="label">{_escape(item.get("floor", ""))}</span>'
+            f'{_badge("risco " + risk, "ok" if risk == "baixo" else "warn")}</div>'
+            f'<div class="proposal-title"><span class="mono">{_escape(item["item"])}</span>'
+            f'<h2>{_escape(_demand_title(str(item.get("title", ""))))}</h2></div>'
+            f'<div class="chips sub">Depende de {_chips(list(item.get("deps", [])))}</div>'
+            f'<p class="sub" style="margin:0">Motivo: {_escape(item.get("reason", ""))}</p>'
+            f'<div class="actions"><button class="accept" data-item="{_escape(item["item"])}" '
+            f'data-floor="{_escape(item.get("floor", ""))}" disabled>Aceitar</button>'
+            '<span class="sub">envia ao orquestrador do andar</span></div></article>')
+    ready = sum(1 for item in proposals if item.get("item"))
+    proposal_html = (f'<div class="grid">{"".join(proposal_cards)}</div>' if proposal_cards else
+                     '<div class="empty">Nenhuma proposta agora: todo andar tem trabalho ou não há item desbloqueado.</div>')
+
+    if accounts:
+        recommendation = next((row.get("recommendation", "") for row in accounts if row.get("watched")),
+                              str(accounts[0].get("recommendation", "")).removeprefix("conta informativa; "))
+        account_html = (f'<div class="banner"><strong>Recomendação</strong><span>{_escape(recommendation)}. '
+                        'O Monitor só recomenda; a troca é sua.</span></div>'
+                        f'<div class="grid">{"".join(_account_card(row, now) for row in accounts)}</div>')
+    else:
+        account_html = ('<div class="empty">Uso das contas indisponível: arquivo de status do Maestri não encontrado. '
+                        'Os limites voltam no próximo ciclo em que a fonte responder.</div>')
+    levels = [str(window.get("level")) for row in accounts for window in row.get("windows", [])]
+    critical, warning = levels.count("CRITICO"), levels.count("AVISO")
+    if critical:
+        accounts_chip = _badge(f"{critical} crítica" if critical == 1 else f"{critical} críticas", "crit")
+    elif warning:
+        accounts_chip = _badge(f"{warning} em aviso", "warn")
+    else:
+        accounts_chip = _badge(str(len(accounts)) if accounts else "—", "neutral")
+
+    local = now.astimezone()
     replacements = {
-        "{{UPDATED_AT}}": _escape(now.isoformat()), "{{DATA_AGE}}": _escape(data_age),
-        "{{SOURCE_STATUS}}": _escape(availability), "{{FLOOR_ROWS}}": floor_html,
-        "{{DEMAND_ROWS}}": demand_html, "{{PROPOSAL_ROWS}}": proposal_html,
-        "{{ACCOUNT_ROWS}}": account_html, "{{EVENT_ROWS}}": event_html,
-        "{{ROADMAP_COUNTS}}": _escape(
-            f"{sum(x['state']=='done' for x in counts.values())} feitos · "
-            f"{sum(x['state'] in ('working', 'reserved') for x in counts.values())} em andamento · "
-            f"{sum(x['state']=='todo' for x in counts.values())} a fazer · "
-            f"{sum(x['state']=='blocked' for x in counts.values())} bloqueados"),
+        "{{FLOOR_COUNT}}": str(len(floors)), "{{UPDATED_AT_ISO}}": _escape(now.isoformat()),
+        "{{UPDATED_AT}}": _escape(local.strftime("%H:%M")), "{{SOURCE_CHIPS}}": source_html,
+        "{{ALERT_STRIP}}": alert_html, "{{FLOOR_CARDS}}": floor_html,
+        "{{TAB_FLOORS}}": _badge(str(len(floors)), "neutral"),
+        "{{TAB_DEMANDS}}": _badge(str(len(rows)) if roadmap is not None else "—", "neutral"),
+        "{{TAB_PROPOSALS}}": _badge(str(ready), "info" if ready else "neutral"), "{{TAB_ACCOUNTS}}": accounts_chip,
+        "{{DEMAND_FILTERS}}": filter_html, "{{DEMAND_ROWS}}": demand_html,
+        "{{PROPOSAL_CARDS}}": proposal_html, "{{ACCOUNT_CARDS}}": account_html,
     }
     for key, value in replacements.items():
         template = template.replace(key, value)
@@ -515,21 +677,23 @@ def _paths(paths: dict[str, Path] | None) -> dict[str, Path | None]:
     return result
 
 
-def _age_label(paths: dict[str, Path | None], now: datetime) -> str:
-    parts = []
-    for label, key in (("workspace", "workspace"), ("contas", "usage")):
+def _source_ages(paths: dict[str, Path | None], now: datetime, unavailable: list[str]) -> list[tuple[str, str, bool]]:
+    sources = []
+    for label, key, prefix in (("workspace", "workspace", "workspace"), ("contas", "usage", "contas")):
         path = paths.get(key)
         try:
             modified = datetime.fromtimestamp(path.stat().st_mtime, timezone.utc) if path else None
         except OSError:
             modified = None
-        if modified is None:
-            parts.append(f"{label}: indisponível")
+        down = any(item.startswith(prefix) for item in unavailable)
+        if modified is None or down:
+            sources.append((label, "indisponível", False))
         else:
             minutes = max(0, int((now - modified).total_seconds() // 60))
-            parts.append(f"{label}: {minutes} min")
-    parts.append("roadmap: atualizado neste ciclo")
-    return " · ".join(parts)
+            sources.append((label, f"{minutes} min", True))
+    roadmap_down = "roadmap indisponível" in unavailable
+    sources.append(("roadmap", "indisponível" if roadmap_down else "neste ciclo", not roadmap_down))
+    return sources
 
 
 def run_check(now: datetime | None = None, paths: dict[str, Path] | None = None,
@@ -568,6 +732,7 @@ def run_check(now: datetime | None = None, paths: dict[str, Path] | None = None,
     except (OSError, subprocess.SubprocessError):
         unavailable.append("roadmap indisponível")
     proposals = propose_items(roadmap or {}, config)
+    _write_json(runtime / "propostas.json", {"generated_at": now.isoformat(), "proposals": proposals})
     floor_views, floor_events, next_floors = _floor_views(payload, config, repo, old_state, now, runner, roadmap or {})
     account_status = _read_json(resolved["usage"])
     if account_status is None:
@@ -583,10 +748,10 @@ def run_check(now: datetime | None = None, paths: dict[str, Path] | None = None,
     next_state.update({"schema_version": 1, "updated_at": now.isoformat(), "floors": next_floors})
     _write_json(state_path, next_state)
     try:
-        rendered = _render(resolved["template"], now, _age_label(resolved, now), floor_views, roadmap,
+        rendered = _render(resolved["template"], now, _source_ages(resolved, now, unavailable), floor_views, roadmap,
                            proposals, account_rows, unavailable, floor_events + account_events)
     except (OSError, UnicodeError):
-        rendered = _render(DEFAULT_TEMPLATE, now, _age_label(resolved, now), floor_views, roadmap,
+        rendered = _render(DEFAULT_TEMPLATE, now, _source_ages(resolved, now, unavailable), floor_views, roadmap,
                            proposals, account_rows, unavailable + ["template indisponível"],
                            floor_events + account_events)
     panel_path.parent.mkdir(parents=True, exist_ok=True)
