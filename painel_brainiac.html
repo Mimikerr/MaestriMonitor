@@ -306,7 +306,7 @@ function reply(e, n, total) {
     } else { close(); html += `<p>${esc(it.x)}</p>`; }
   });
   close();
-  return `<article class="reply ${last ? "last" : "old"}"><div class="rh"><span>${last ? "Última resposta" : "Resposta anterior"}</span><span>${n} de ${total}</span></div>${html}</article>`;
+  return `<article class="reply ${last ? "last" : "old"}"><div class="rh"><span>${(last ? "Última resposta" : "Resposta anterior") + (e.parcial ? " · começo fora da tela" : "")}</span><span>${n} de ${total}</span></div>${html}</article>`;
 }
 function conversation(m) {
   const list = (m && m.conversa) || [];

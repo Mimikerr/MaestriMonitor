@@ -47,6 +47,12 @@ class ConversationLog:
         for n, ev in enumerate(events):
             entry = dict(ev, key=keys[n])
             idx = find(entry["key"])
+            if idx is None and ev.get("parcial"):
+                idx = self._merge_partial(stored, ev)
+                if idx is not None:
+                    last = idx
+                    changed = True
+                    continue
             if idx is None:
                 if last is not None:
                     pos = last + 1  # logo depois da ultima ja conhecida
@@ -68,6 +74,31 @@ class ConversationLog:
         if changed:
             self._save()
         return [{k: v for k, v in e.items() if k != "key"} for e in stored]
+
+    @staticmethod
+    def _merge_partial(stored: list[dict[str, Any]], ev: dict[str, Any]) -> int | None:
+        """Trecho de resposta cujo comeco saiu da tela: completa a resposta ja guardada que o contem.
+
+        O trecho comeca no meio de um paragrafo; procura-se onde ele recomeca na resposta guardada
+        (mais recente primeiro) e se troca o resto pelo que a tela mostra agora.
+        """
+        items = ev.get("items") or []
+        if not items:
+            return None
+        frag = items[0]["x"][:40]
+        if len(frag) < 12:
+            return None
+        for i in range(len(stored) - 1, -1, -1):
+            e = stored[i]
+            if e.get("k") != "resp":
+                continue
+            for j, it in enumerate(e.get("items", [])):
+                pos = it["x"].find(frag)
+                if pos >= 0:
+                    head = dict(it, x=it["x"][:pos] + items[0]["x"])
+                    e["items"] = e["items"][:j] + [head] + items[1:]
+                    return i
+        return None
 
     def _save(self) -> None:
         if not self.path:

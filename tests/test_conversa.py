@@ -82,3 +82,42 @@ class ConversationLogTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class FerramentasEParciaisTests(unittest.TestCase):
+    def test_chamada_de_ferramenta_nao_e_resposta(self):
+        lines = ["● Checar worktree do roteiro", "  ⎿  $ cd /c/x; git status", "     saida longa", "",
+                 "● Running 1 shell command…", "", "● Resposta de verdade.", "  segue"]
+        ev = extract_events(lines)
+        self.assertEqual([e["lines"] for e in ev], [["Resposta de verdade.", "segue"]])
+
+    def test_nota_do_sistema_na_ordem_e_ignorada(self):
+        ev = extract_events(["❯ teste", "  ⎿  8 skills available", "", "● ok"])
+        self.assertEqual(ev[0], {"k": "ordem", "lines": ["teste"]})
+
+    def test_resposta_com_a_bolinha_fora_da_tela_vira_parcial_so_quando_permitido(self):
+        lines = ["  meio de um paragrafo que continua", "  - item novo", "", "✻ Cooked for 3s"]
+        self.assertEqual(extract_events(lines), [])
+        ev = extract_events(lines, partial_top=True)
+        self.assertEqual(len(ev), 1)
+        self.assertTrue(ev[0]["parcial"])
+        self.assertEqual(ev[0]["lines"], ["meio de um paragrafo que continua", "- item novo"])
+
+    def test_log_completa_a_resposta_guardada_com_o_trecho_parcial(self):
+        log = ConversationLog()
+        inicio = {"k": "resp", "items": [{"t": "p", "n": "", "x": "Titulo da resposta"},
+                                          {"t": "p", "n": "", "x": "Este paragrafo longo explica a situacao do repositorio"}]}
+        log.update("t", [inicio])
+        parcial = {"k": "resp", "parcial": True, "items": [
+            {"t": "p", "n": "", "x": "Este paragrafo longo explica a situacao do repositorio e o que fazer depois"},
+            {"t": "li", "n": "", "x": "item novo"}]}
+        out = log.update("t", [parcial])
+        self.assertEqual(len(out), 1)
+        self.assertEqual([i["x"] for i in out[0]["items"]], [
+            "Titulo da resposta", "Este paragrafo longo explica a situacao do repositorio e o que fazer depois", "item novo"])
+
+    def test_parcial_sem_correspondencia_fica_como_entrada_propria(self):
+        log = ConversationLog()
+        out = log.update("t", [{"k": "resp", "parcial": True, "items": [{"t": "p", "n": "", "x": "trecho sem inicio conhecido"}]}])
+        self.assertEqual(len(out), 1)
+        self.assertTrue(out[0]["parcial"])

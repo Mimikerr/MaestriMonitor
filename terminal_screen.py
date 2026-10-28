@@ -31,6 +31,7 @@ class Screen:
         self.pending = False
         self.top, self.bottom = 0, self.rows - 1
         self.saved = (0, 0)
+        self.alt = False
 
     # --- operacoes basicas ---
     def _blank(self) -> list[str]:
@@ -39,7 +40,7 @@ class Screen:
     def _scroll_up(self, n: int = 1) -> None:
         for _ in range(n):
             gone = self.grid.pop(self.top)
-            if self.top == 0:
+            if self.top == 0 and not self.alt:
                 self.history.append("".join(gone).rstrip())
                 del self.history[:-HISTORY]
             self.grid.insert(self.bottom, self._blank())
@@ -74,7 +75,15 @@ class Screen:
     # --- CSI ---
     def _csi(self, private: str, params: str, final: str) -> None:
         if private:
-            return  # modos (?25h, ?1049h...) nao mudam o texto
+            # tela alternativa (?1049h): app de tela cheia, sem historico de rolagem proprio do terminal
+            if final in "hl" and any(x in ("1049", "47", "1047") for x in re.split(r"[;:]", params)):
+                self.alt = final == "h"
+                if self.alt:
+                    self.history.clear()
+                    self.grid = [self._blank() for _ in range(self.rows)]
+                    self.x = self.y = 0
+                    self.pending = False
+            return  # os demais modos (?25h...) nao mudam o texto
         nums = [int(p) if p.isdigit() else 0 for p in re.split(r"[;:]", params)] if params else []
         a = nums[0] if nums and nums[0] else 1
         self.pending = False
@@ -315,12 +324,25 @@ def _neighbor(lines: list[str], i: int, step: int) -> str:
     return lines[j] if 0 <= j < len(lines) else ""
 
 
-def extract_events(lines: list[str]) -> list[dict]:
-    """Ordens enviadas (`❯ texto`, fora da caixa de entrada) e respostas, na ordem da tela."""
+_TOOL_MARK = ("⎿", "└")  # ⎿ e └: saida de ferramenta
+_STATUS = re.compile(r"^(Running|Listing|Reading|Searching|Fetching|Writing|Editing|Updating|Creating|Waiting|Thinking|Searched|Read|Ran)\b.*(…|\(ctrl\+o to expand\))\s*$")
+
+
+def extract_events(lines: list[str], partial_top: bool = False) -> list[dict]:
+    """Ordens enviadas (`❯ texto`, fora da caixa de entrada) e respostas, na ordem da tela.
+
+    Chamadas de ferramenta (bolinha com saida `⎿`, "Running 1 shell command…") nao sao respostas.
+    Com `partial_top`, o texto recuado no topo da tela (resposta cuja bolinha ja saiu da tela)
+    vira uma resposta marcada como `parcial`.
+    """
     events: list[dict] = []
     cur: dict | None = None
+    started = False
     for i, raw in enumerate(lines):
-        ln = raw.replace("\xa0", " ")
+        ln = raw.replace(" ", " ")
+        first = not started and bool(ln.strip())
+        if first:
+            started = True
         pm = _PROMPT.match(ln)
         if pm:
             if _SEP.match(_neighbor(lines, i, -1)) and _SEP.match(_neighbor(lines, i, 1)):
@@ -338,6 +360,11 @@ def extract_events(lines: list[str]) -> list[dict]:
                 events.append(cur)
             continue
         if cur is None:
+            indent = len(ln) - len(ln.lstrip(" "))
+            if (first and partial_top and 2 <= indent <= MAX_INDENT and not _TOOL_SUMMARY.match(ln)
+                    and not ln.strip().startswith(_TOOL_MARK)):
+                cur = {"k": "resp", "lines": [ln[2:]], "parcial": True}
+                events.append(cur)
             continue
         if not ln.strip():
             if cur["k"] == "ordem":
@@ -346,14 +373,22 @@ def extract_events(lines: list[str]) -> list[dict]:
                 cur["lines"].append("")
             continue
         indent = len(ln) - len(ln.lstrip(" "))
+        if ln.strip().startswith(_TOOL_MARK):
+            if cur["k"] == "resp":
+                cur["tool"] = True  # a "resposta" era uma chamada de ferramenta
+            continue
         if indent == 0 or _TOOL_SUMMARY.match(ln):
             cur = None
         elif indent <= MAX_INDENT:
             cur["lines"].append(ln[2:] if ln.startswith("  ") else ln)
+    out = []
     for e in events:
         while e["lines"] and not e["lines"][-1].strip():
             e["lines"].pop()
-    return [e for e in events if e["lines"]]
+        if not e["lines"] or e.get("tool") or _STATUS.match(e["lines"][0]):
+            continue
+        out.append(e)
+    return out
 
 
 def detect_activity(lines: list[str]) -> str:
@@ -371,9 +406,9 @@ def render_conversation(raw: str, cols: int = 120, rows: int = 40) -> tuple[list
     scr.feed(raw or "")
     lines = [ln[:240] for ln in scr.lines()]
     events = []
-    for e in extract_events(lines):
+    for e in extract_events(lines, partial_top=not scr.history):
         if e["k"] == "ordem":
             events.append({"k": "ordem", "x": " ".join(s.strip() for s in e["lines"])})
         else:
-            events.append({"k": "resp", "items": structure_block(e["lines"])})
+            events.append({"k": "resp", "items": structure_block(e["lines"]), **({"parcial": True} if e.get("parcial") else {})})
     return events, detect_activity(lines)
