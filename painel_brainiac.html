@@ -149,6 +149,15 @@ main:not(.shelf) .step{padding:4px 8px}
 .tg:disabled{opacity:.45;cursor:not-allowed}
 .tg:focus-visible,.btn:focus-visible,.sheet:focus-visible{outline:2px solid #2F55D4;outline-offset:2px}
 .sheet{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
+.field{flex:1 1 360px;min-width:0;display:flex;flex-direction:column;gap:8px}
+.sheet .field textarea{flex:none;width:100%}
+.acts{display:flex;flex-direction:column;gap:8px}
+.thumbs{display:flex;flex-wrap:wrap;gap:8px}
+.th{position:relative;width:64px;height:64px;border:1px solid var(--line2);border-radius:6px;overflow:hidden;background:var(--surface3)}
+.th img{width:100%;height:100%;object-fit:cover;display:block}
+.th button{position:absolute;top:2px;right:2px;width:24px;height:24px;border-radius:50%;border:0;background:var(--ink);color:var(--on-ink);cursor:pointer;font-size:14px;line-height:1;opacity:.92}
+.th button:focus-visible{outline:2px solid #2F55D4;outline-offset:1px}
+main:not(.shelf) .acts{flex-direction:row}
 .sheet textarea{flex:1 1 360px;min-width:0;min-height:84px;padding:12px 14px;border-radius:6px;border:1px solid var(--line2);background-color:var(--surface2);color:var(--fg);font:14px/28px 'Instrument Sans',sans-serif;resize:vertical;background-image:repeating-linear-gradient(transparent,transparent 27px,var(--line) 27px,var(--line) 28px);background-attachment:local;background-position:0 12px;background-origin:padding-box}
 .sheet textarea:focus{outline:2px solid #2F55D4;outline-offset:1px}
 .sheet .btn.pri{min-height:48px;padding:0 22px}
@@ -371,10 +380,52 @@ function render(force) {
 const targetOf = (alias) => snap.projects.find((x) => x.apelido === alias);
 const online = (p) => { const m = p && maestro(p); return !!m && m.status === "running"; };
 let pick = null, pending = null, builtFor = null;
+// imagens anexadas à ordem: o servidor as salva e a ordem leva o caminho dos arquivos
+let atts = [];
+const MAX_ATT = 5, MAX_ATT_BYTES = 8 * 1024 * 1024, IMG_TYPES = ["image/png", "image/jpeg", "image/gif", "image/webp"];
+function addFiles(files) {
+  const refused = [];
+  for (const f of files) {
+    if (!IMG_TYPES.includes(f.type)) refused.push(`${f.name || "arquivo"}: só PNG, JPEG, GIF ou WEBP`);
+    else if (f.size > MAX_ATT_BYTES) refused.push(`${f.name || "imagem"}: acima de 8 MB`);
+    else if (atts.length >= MAX_ATT) refused.push(`máximo de ${MAX_ATT} imagens por ordem`);
+    else atts.push({ file: f, url: URL.createObjectURL(f) });
+  }
+  drawThumbs();
+  if (refused.length) showResult(false, "Não anexei: " + refused.join("; ") + ".");
+}
+function drawThumbs() {
+  const t = $("thumbs");
+  if (!t) return;
+  t.hidden = !atts.length;
+  t.innerHTML = atts.map((a, i) => `<span class="th"><img src="${a.url}" alt="Imagem anexada ${i + 1}"><button type="button" data-rm="${i}" aria-label="Remover imagem ${i + 1}">×</button></span>`).join("");
+}
+document.addEventListener("click", (e) => {
+  const rm = e.target.closest("[data-rm]");
+  if (rm) { const [a] = atts.splice(Number(rm.dataset.rm), 1); if (a) URL.revokeObjectURL(a.url); drawThumbs(); }
+  if (e.target.closest("#att-btn")) $("att-file").click();
+});
+document.addEventListener("change", (e) => {
+  if (e.target.id === "att-file") { addFiles([...e.target.files]); e.target.value = ""; }
+});
+document.addEventListener("paste", (e) => {
+  if (e.target.id !== "ord" || !e.clipboardData) return;
+  const imgs = [...e.clipboardData.items].filter((i) => i.kind === "file" && i.type.startsWith("image/")).map((i) => i.getAsFile()).filter(Boolean);
+  if (imgs.length) { e.preventDefault(); addFiles(imgs); }
+});
+const hasFiles = (e) => e.dataTransfer && [...e.dataTransfer.types].includes("Files");
+document.addEventListener("dragover", (e) => { if (hasFiles(e) && e.target.closest("#composer")) e.preventDefault(); });
+document.addEventListener("drop", (e) => {
+  if (!hasFiles(e) || !e.target.closest("#composer")) return;
+  e.preventDefault();
+  addFiles([...e.dataTransfer.files]);
+});
 function buildComposer() {
   const p = targetOf(sel());
   builtFor = sel();
   pending = null;
+  atts.forEach((a) => URL.revokeObjectURL(a.url));
+  atts = [];
   const chips = p ? "" : `<div class="targets" role="group" aria-label="Escolha o caderno">${snap.projects.filter((x) => x.encontrado).map((x) =>
     `<button type="button" class="tg" data-pick="${esc(x.apelido)}" aria-pressed="false"><i style="background:${esc(x.cor)}"></i>${esc(x.nome)}</button>`).join("")}</div>`;
   $("composer").innerHTML = `<section class="desk" style="border-top-color:${p ? esc(p.cor) : "var(--line2)"}" aria-label="Enviar ordem">
@@ -382,10 +433,13 @@ function buildComposer() {
       <button type="button" class="btn" id="desk-toggle" aria-controls="deskbody" aria-expanded="true"></button></div>
     <div class="deskbody" id="deskbody">${chips}
     <form class="sheet" id="sheet" autocomplete="off">
-      <textarea id="ord" maxlength="2000" rows="3" aria-label="Texto da ordem"></textarea>
-      <button class="btn pri" type="submit">Enviar ordem</button>
+      <div class="field"><div class="thumbs" id="thumbs" hidden></div>
+        <textarea id="ord" maxlength="2000" rows="3" aria-label="Texto da ordem"></textarea></div>
+      <div class="acts"><button type="button" class="btn" id="att-btn">Anexar imagem</button>
+        <input type="file" id="att-file" accept="image/png,image/jpeg,image/gif,image/webp" multiple hidden>
+        <button class="btn pri" type="submit">Enviar ordem</button></div>
     </form>
-    <div class="hint">Enter envia para conferência. Nada vai ao maestro antes de você confirmar.</div>
+    <div class="hint">Enter envia para conferência. Cole (Ctrl+V), arraste ou anexe prints. Nada vai ao maestro antes de você confirmar.</div>
     <div id="ord-confirm" class="confirm" hidden></div>
     <div id="ord-result" role="status" aria-live="polite"></div></div></section>`;
   pick = p ? p.apelido : null;
@@ -427,8 +481,10 @@ function syncComposer() {
   ord.placeholder = !p ? "Escolha um caderno acima"
     : online(p) ? `Ordem para ${m ? m.nome : "o maestro"} (${p.nome}). Enter envia para conferência.`
       : `O maestro de ${p.nome} está parado. Inicie-o no Brainiac para enviar.`;
-  ord.disabled = !p || !online(p);
-  $("sheet").querySelector("button").disabled = !p || !online(p);
+  const off = !p || !online(p);
+  ord.disabled = off;
+  $("sheet").querySelector("button.pri").disabled = off;
+  $("att-btn").disabled = off;
 }
 function showResult(ok, text) { $("ord-result").innerHTML = `<div class="res ${ok ? "ok" : "er"}">${esc(text)}</div>`; }
 document.addEventListener("click", (e) => {
@@ -443,13 +499,14 @@ document.addEventListener("submit", (e) => {
   e.preventDefault();
   const p = targetOf(pick), text = $("ord").value.trim();
   if (!p || !online(p)) return showResult(false, "Escolha um caderno com maestro rodando.");
-  if (!text) return showResult(false, "Escreva a ordem antes de enviar.");
+  if (!text && !atts.length) return showResult(false, "Escreva a ordem ou anexe uma imagem antes de enviar.");
   const mm = maestro(p);
-  pending = { projeto: p.apelido, mensagem: text };
+  pending = { projeto: p.apelido, mensagem: text, imagens: atts.slice() };
   $("ord-result").innerHTML = "";
   const c = $("ord-confirm");
   c.hidden = false;
-  c.innerHTML = `<span class="lbl">Confirmar envio</span><div>Enviar para <strong>${esc(mm.nome)}</strong> (${esc(p.nome)}):</div><q>${esc(text)}</q>
+  const pics = atts.length ? `<div class="thumbs">${atts.map((a, i) => `<span class="th"><img src="${a.url}" alt="Imagem ${i + 1}"></span>`).join("")}</div>` : "";
+  c.innerHTML = `<span class="lbl">Confirmar envio</span><div>Enviar para <strong>${esc(mm.nome)}</strong> (${esc(p.nome)}):</div>${text ? `<q>${esc(text)}</q>` : ""}${pics}
     <div class="row"><button class="btn pri" type="button" data-send>Confirmar e enviar</button><button class="btn" type="button" data-cancel>Cancelar</button></div>`;
   c.querySelector("[data-send]").focus();
 });
@@ -458,10 +515,25 @@ document.addEventListener("click", async (e) => {
   if (!e.target.closest("[data-send]") || !pending) return;
   const body = pending; pending = null; $("ord-confirm").hidden = true;
   try {
-    const r = await fetch("/api/enviar", { method: "POST", headers: { "Content-Type": "application/json", "X-Painel": "1" }, body: JSON.stringify(body) });
+    const caminhos = [];
+    if (body.imagens.length) showResult(true, `Enviando ${body.imagens.length} imagem(ns)…`);
+    for (const a of body.imagens) {
+      const up = await fetch("/api/anexo", { method: "POST", headers: { "Content-Type": a.file.type, "X-Painel": "1" }, body: a.file });
+      const ud = await up.json();
+      if (!ud.ok) return showResult(false, `Imagem não enviada: ${ud.erro || "erro ao salvar"}. Nada foi enviado ao maestro.`);
+      caminhos.push(ud.caminho);
+    }
+    const base = body.mensagem || "Veja as imagens anexadas e responda.";
+    const mensagem = caminhos.length ? `${base} [Imagens anexadas, leia os arquivos: ${caminhos.join(" ; ")}]` : base;
+    const r = await fetch("/api/enviar", { method: "POST", headers: { "Content-Type": "application/json", "X-Painel": "1" }, body: JSON.stringify({ projeto: body.projeto, mensagem }) });
     const d = await r.json();
-    if (d.ok) { showResult(true, `Enviado a ${d.maestro} (${d.projeto}).`); $("ord").value = ""; }
-    else showResult(false, d.erro || "Não foi possível enviar.");
+    if (d.ok) {
+      showResult(true, `Enviado a ${d.maestro} (${d.projeto})${caminhos.length ? ` com ${caminhos.length} imagem(ns)` : ""}.`);
+      $("ord").value = "";
+      atts.forEach((a) => URL.revokeObjectURL(a.url));
+      atts = [];
+      drawThumbs();
+    } else showResult(false, d.erro || "Não foi possível enviar.");
   } catch (err) { showResult(false, "Painel offline: nada foi enviado."); }
 });
 document.addEventListener("click", (e) => {

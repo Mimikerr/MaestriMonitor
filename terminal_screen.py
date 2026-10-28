@@ -324,6 +324,7 @@ def _neighbor(lines: list[str], i: int, step: int) -> str:
     return lines[j] if 0 <= j < len(lines) else ""
 
 
+_NOISE = re.compile(r"^(How is Claude doing|Tip:|Update available|Press Ctrl-C again|Interrupted)")
 _TOOL_MARK = ("⎿", "└")  # ⎿ e └: saida de ferramenta
 _STATUS = re.compile(r"^(Running|Listing|Reading|Searching|Fetching|Writing|Editing|Updating|Creating|Waiting|Thinking|Searched|Read|Ran)\b.*(…|\(ctrl\+o to expand\))\s*$")
 
@@ -385,7 +386,7 @@ def extract_events(lines: list[str], partial_top: bool = False) -> list[dict]:
     for e in events:
         while e["lines"] and not e["lines"][-1].strip():
             e["lines"].pop()
-        if not e["lines"] or e.get("tool") or _STATUS.match(e["lines"][0]):
+        if not e["lines"] or e.get("tool") or _STATUS.match(e["lines"][0]) or _NOISE.match(e["lines"][0]):
             continue
         out.append(e)
     return out

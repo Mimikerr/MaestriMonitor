@@ -12,6 +12,7 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
+import anexos
 import brainiac_source as source
 from conversa import ConversationLog
 
@@ -57,12 +58,28 @@ class Handler(BaseHTTPRequestHandler):
         return (self.headers.get("Host") in hosts and self.headers.get("X-Painel") == "1"
                 and (origin is None or origin in {f"http://{h}" for h in hosts}))
 
+    def _anexo(self) -> None:
+        try:
+            size = int(self.headers.get("Content-Length") or 0)
+            if size > anexos.MAX_BYTES:
+                raise anexos.AnexoError(413, f"Imagem acima de {anexos.MAX_BYTES // (1024 * 1024)} MB.")
+            path = anexos.save_image(self.rfile.read(size), ROOT / "runtime" / "anexos")
+            self._send_json(200, {"ok": True, "caminho": str(path)})
+        except anexos.AnexoError as exc:
+            self._send_json(exc.status, {"ok": False, "erro": exc.message})
+        except (ValueError, OSError):
+            self._send_json(400, {"ok": False, "erro": "Nao foi possivel salvar a imagem."})
+
     def do_POST(self) -> None:  # noqa: N802
-        if self.path.split("?", 1)[0] != "/api/enviar":
+        route = self.path.split("?", 1)[0]
+        if route not in ("/api/enviar", "/api/anexo"):
             self._send(404, b"nao encontrado", "text/plain; charset=utf-8")
             return
         if not self._origin_ok():
             self._send_json(403, {"ok": False, "erro": "Pedido recusado."})
+            return
+        if route == "/api/anexo":
+            self._anexo()
             return
         try:
             size = int(self.headers.get("Content-Length") or 0)
@@ -109,6 +126,7 @@ def main() -> int:
     port = int(source.load_config().get("porta", 8766))
     server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
     print(f"Painel em http://127.0.0.1:{port}/")
+    anexos.cleanup(ROOT / "runtime" / "anexos")
     threading.Thread(target=_poll, daemon=True).start()
     try:
         server.serve_forever()

@@ -12,7 +12,14 @@ import json
 from pathlib import Path
 from typing import Any
 
+from terminal_screen import _NOISE as NOISE  # noqa: E402
+
 KEEP = 40
+
+
+def _is_noise(entry: dict[str, Any]) -> bool:
+    items = entry.get("items") or []
+    return entry.get("k") == "resp" and bool(items) and bool(NOISE.match(items[0].get("x", "")))
 
 
 def _key(event: dict[str, Any]) -> str:
@@ -37,8 +44,10 @@ class ConversationLog:
 
     def update(self, terminal_id: str, events: list[dict[str, Any]]) -> list[dict[str, Any]]:
         stored = self.data.setdefault(terminal_id, [])
+        before = len(stored)
+        stored[:] = [e for e in stored if not _is_noise(e)]  # ruido guardado antes de existir o filtro
         last: int | None = None
-        changed = False
+        changed = len(stored) != before
         keys = [_key(e) for e in events]
 
         def find(key: str) -> int | None:

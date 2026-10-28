@@ -213,7 +213,7 @@ def build_snapshot(config: dict[str, Any], brainiac_dir: Path | None = None,
     return snap
 
 
-MAX_MESSAGE = 2000
+MAX_MESSAGE = 3000
 
 
 class SendError(Exception):

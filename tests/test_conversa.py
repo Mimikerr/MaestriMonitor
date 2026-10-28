@@ -121,3 +121,17 @@ class FerramentasEParciaisTests(unittest.TestCase):
         out = log.update("t", [{"k": "resp", "parcial": True, "items": [{"t": "p", "n": "", "x": "trecho sem inicio conhecido"}]}])
         self.assertEqual(len(out), 1)
         self.assertTrue(out[0]["parcial"])
+
+
+class RuidoDaInterfaceTests(unittest.TestCase):
+    def test_pesquisa_de_satisfacao_nao_e_resposta(self):
+        lines = ["● O texto e PAINEL 7421.", "", "✻ Cooked for 5s", "", "● How is Claude doing this session? (optional)",
+                 "  1: Bad    2: Fine   3: Good   0: Dismiss"]
+        self.assertEqual([e["lines"] for e in extract_events(lines)], [["O texto e PAINEL 7421."]])
+
+    def test_historico_descarta_ruido_guardado_antes_do_filtro(self):
+        log = ConversationLog()
+        log.data["t"] = [{"k": "resp", "key": "r:How is", "items": [{"t": "p", "n": "", "x": "How is Claude doing this session? (optional)"}]},
+                         {"k": "resp", "key": "r:ok", "items": [{"t": "p", "n": "", "x": "ok"}]}]
+        out = log.update("t", [])
+        self.assertEqual([e["items"][0]["x"] for e in out], ["ok"])
