@@ -38,6 +38,19 @@ h1{margin:0;font:600 28px/1.15 'Fraunces',Georgia,serif}
 .bar.at i{background:var(--attn)}.bar.er i{background:var(--err)}
 .banner{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;padding:12px 16px;background:var(--surface);border:1px solid var(--line);border-left:6px solid var(--err);border-radius:8px}
 .banner b{font:600 16px 'Fraunces',Georgia,serif;color:var(--err)}
+.ctl{display:inline-flex;gap:4px;margin-left:auto}
+.ib{width:36px;height:36px;display:inline-grid;place-items:center;border-radius:6px;border:1px solid var(--line2);background:var(--surface);color:var(--fg);cursor:pointer;font-size:13px}
+.ib:hover:not(:disabled){background:var(--surface3)}
+.ib:disabled{opacity:.35;cursor:not-allowed}
+.ib:focus-visible{outline:2px solid #2F55D4;outline-offset:2px}
+.slot{position:relative;display:flex;flex-direction:column;cursor:grab}
+.slot .ctl{position:absolute;left:50%;bottom:8px;transform:translateX(-50%);margin:0;background:var(--surface);padding:3px;border-radius:8px;border:1px solid var(--line2)}
+.book.edit{cursor:grab;outline:2px dashed var(--line2);outline-offset:3px}
+.book.edit:hover{transform:none}
+.ghead.edit{cursor:grab}
+.dragging{opacity:.45}
+.dropat .book{outline:2px solid #2F55D4;outline-offset:3px}
+.ghead.dropat{border-bottom-color:#2F55D4;border-bottom-width:3px}
 .group{display:flex;flex-direction:column;gap:14px}
 .ghead{display:flex;align-items:baseline;gap:12px;padding:6px 4px 0;border-bottom:1px solid var(--line)}
 .ghead h2{margin:0;font:600 20px 'Fraunces',Georgia,serif}
@@ -118,6 +131,7 @@ main.shelf #composer{order:-1}
       <h1 id="title">Estante de cadernos</h1>
     </div>
     <div class="row">
+      <button id="org-btn" class="btn" type="button" aria-pressed="false" hidden>Organizar estante</button>
       <button id="usage-btn" class="btn" aria-expanded="false"><span class="lbl">Uso</span><span id="usage-sum" class="mono" style="font-size:12px">—</span><span id="usage-chev" class="mono mu" style="font-size:12px">▾</span></button>
       <span id="live" class="stamp live id"><span class="sd"></span>conectando</span>
     </div>
@@ -156,17 +170,42 @@ function renderUsage() {
     <div class="m"><span class="mu" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(w.label)} · ${esc(resets(w.resets_at))}</span><span class="mono" style="text-align:right">${w.percent}%</span>
     <div class="bar ${tone(w.percent)}"><i style="width:${Math.min(100, w.percent)}%"></i></div></div>`).join("")}</div>`).join("");
 }
-function book(p) {
+function book(p, edit) {
   const [cls, label] = estado(p), m = maestro(p), mst = m ? ST[m.status]?.[1] || m.status : "sem maestro";
   const b = p.branches, pl = p.plano;
   const release = b ? (b.aguardando_release.length ? `${b.aguardando_release.length} aguardando release` : "Release em dia") : "Sem repositório ligado";
   const plano = pl && pl.total ? `Plano ${pl.done}/${pl.total}` : "Sem plano";
   const err = p.agentes.some((a) => a.status === "error");
-  return `<button class="book" data-open="${esc(p.apelido)}" aria-label="Abrir o caderno ${esc(p.nome)}, ${label}">
+  const tag = edit ? "div" : "button";
+  const attrs = edit ? `class="book edit" aria-label="${esc(p.nome)}"` : `class="book" data-open="${esc(p.apelido)}" aria-label="Abrir o caderno ${esc(p.nome)}, ${label}"`;
+  return `<${tag} ${attrs}>
     <span class="spine" aria-hidden="true" style="background:${esc(p.cor)}"><span>@${esc(p.apelido)}</span></span>
     <span class="cover"><h3>${esc(p.nome)}</h3><span class="stamp ${cls}"><span class="sd"></span>${label}</span>
     <span class="facts"><span><strong>${p.agentes.length}</strong> agentes</span><span>Maestro: ${esc(m ? m.nome + " · " + mst : mst)}</span><span>${esc(release)}</span><span>${esc(plano)}</span></span>
-    <span class="open-l">Abrir caderno →</span></span>${err ? '<span class="ribbon" aria-hidden="true"></span>' : ""}</button>`;
+    <span class="open-l">${edit ? "&nbsp;" : "Abrir caderno →"}</span></span>${err ? '<span class="ribbon" aria-hidden="true"></span>' : ""}</${tag}>`;
+}
+// ordem das estantes (grupos e livros), guardada neste navegador
+let editing = false;
+let order = (() => { try { return JSON.parse(localStorage.getItem("painel.ordem")) || {}; } catch (e) { return {}; } })();
+const saveOrder = () => { try { localStorage.setItem("painel.ordem", JSON.stringify(order)); } catch (e) { /* sem armazenamento */ } };
+const byOrder = (items, saved, key) => items.map((x, n) => [x, n])
+  .sort((a, b) => { const ia = (saved || []).indexOf(key(a[0])), ib = (saved || []).indexOf(key(b[0])); return (ia < 0 ? 1e6 : ia) - (ib < 0 ? 1e6 : ib) || a[1] - b[1]; }).map((p) => p[0]);
+const moved = (list, from, to) => { const a = list.slice(); if (from < 0 || to < 0 || to >= a.length) return a; a.splice(to, 0, a.splice(from, 1)[0]); return a; };
+function shelfGroups() {
+  const base = ["", ...(snap.grupos || [])].map((g) => ({ nome: g, itens: snap.projects.filter((p) => (p.grupo || "") === g) })).filter((g) => g.itens.length);
+  return byOrder(base, order.grupos, (g) => g.nome).map((g) => ({ ...g, itens: byOrder(g.itens, (order.livros || {})[g.nome], (p) => p.apelido) }));
+}
+function moveGroup(name, to) {
+  const names = shelfGroups().map((g) => g.nome);
+  order.grupos = moved(names, names.indexOf(name), typeof to === "number" ? to : names.indexOf(name));
+  saveOrder();
+}
+function moveBook(group, alias, to) {
+  const g = shelfGroups().find((x) => x.nome === group);
+  if (!g) return;
+  const list = g.itens.map((p) => p.apelido);
+  order.livros = { ...(order.livros || {}), [group]: moved(list, list.indexOf(alias), to) };
+  saveOrder();
 }
 function renderShelf() {
   $("title").textContent = "Estante de cadernos";
@@ -174,13 +213,18 @@ function renderShelf() {
   const erros = ps.filter((p) => p.agentes.some((a) => a.status === "error")).length;
   $("banner").innerHTML = erros ? `<div class="banner"><b>Marcadores vermelhos</b><span class="mu">${erros} caderno(s) com agente em erro. Abra o caderno para ver o que houve.</span></div>` : "";
   // um bloco por grupo da barra lateral do Brainiac: primeiro os cadernos sem grupo, depois cada grupo na ordem dele
-  const order = ["", ...(snap.grupos || [])];
-  const groups = order.map((g) => ({ nome: g, itens: ps.filter((p) => (p.grupo || "") === g) })).filter((g) => g.itens.length);
-  $("view").innerHTML = groups.map((g) => {
+  const groups = shelfGroups();
+  const arrow = (attrs, label, glyph) => `<button type="button" class="ib" ${attrs} aria-label="${esc(label)}">${glyph}</button>`;
+  $("view").innerHTML = groups.map((g, gi) => {
     const rows = [];
     for (let i = 0; i < g.itens.length; i += per) rows.push(g.itens.slice(i, i + per));
-    return `<section class="group" aria-label="${esc(g.nome || "Sem grupo")}"><div class="ghead"><h2>${esc(g.nome || "Sem grupo")}</h2><span class="mu">${g.itens.length} ${g.itens.length === 1 ? "caderno" : "cadernos"}</span></div>` +
-      rows.map((r) => `<div class="shelf"><div class="books">${r.map(book).join("")}</div><div class="plank"></div></div>`).join("") + "</section>";
+    const gname = g.nome || "Sem grupo";
+    const gctl = editing ? `<span class="ctl">${arrow(`data-gmv="-1" data-g="${esc(g.nome)}"${gi === 0 ? " disabled" : ""}`, `Subir o grupo ${gname}`, "▲")}${arrow(`data-gmv="1" data-g="${esc(g.nome)}"${gi === groups.length - 1 ? " disabled" : ""}`, `Descer o grupo ${gname}`, "▼")}</span>` : "";
+    const slot = (p, idx) => !editing ? book(p) : `<div class="slot" draggable="true" data-bk="${esc(p.apelido)}" data-g="${esc(g.nome)}">${book(p, true)}
+      <span class="ctl">${arrow(`data-bmv="-1" data-bk="${esc(p.apelido)}" data-g="${esc(g.nome)}"${idx === 0 ? " disabled" : ""}`, `Mover ${p.nome} para antes`, "◀")}${arrow(`data-bmv="1" data-bk="${esc(p.apelido)}" data-g="${esc(g.nome)}"${idx === g.itens.length - 1 ? " disabled" : ""}`, `Mover ${p.nome} para depois`, "▶")}</span></div>`;
+    let n = -1;
+    return `<section class="group" aria-label="${esc(gname)}"><div class="ghead${editing ? " edit" : ""}" ${editing ? `draggable="true" data-gdrag="${esc(g.nome)}"` : ""}><h2>${esc(gname)}</h2><span class="mu">${g.itens.length} ${g.itens.length === 1 ? "caderno" : "cadernos"}</span>${gctl}</div>` +
+      rows.map((r) => `<div class="shelf"><div class="books">${r.map((p) => slot(p, ++n)).join("")}</div><div class="plank"></div></div>`).join("") + "</section>";
   }).join("");
   shelfPer = per;
 }
@@ -233,7 +277,11 @@ function renderNotebook(p) {
 let lastSig = "", lastView = "";
 function render(force) {
   if (!snap || !snap.ok) return;
-  const sig = JSON.stringify({ ...snap, generated_at: 0 }) + "|" + usageOpen + "|" + sel();
+  const sig = JSON.stringify({ ...snap, generated_at: 0 }) + "|" + usageOpen + "|" + sel() + "|" + editing + JSON.stringify(order);
+  const ob = $("org-btn");
+  ob.hidden = !!sel();
+  ob.textContent = editing ? "Concluir" : "Organizar estante";
+  ob.setAttribute("aria-pressed", String(editing));
   if (!force && sig === lastSig && $("view").innerHTML) return;
   lastSig = sig;
   const old = document.querySelector("pre.term");
@@ -351,6 +399,58 @@ document.addEventListener("click", (e) => {
   if (b) location.hash = "";
 });
 $("usage-btn").addEventListener("click", () => { usageOpen = !usageOpen; render(); });
+$("org-btn").addEventListener("click", () => { editing = !editing; render(); });
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-bmv]"), g = e.target.closest("[data-gmv]");
+  if (b && !b.disabled) {
+    const grp = snap.projects.find((p) => p.apelido === b.dataset.bk).grupo || "";
+    const list = shelfGroups().find((x) => x.nome === grp).itens.map((p) => p.apelido);
+    moveBook(grp, b.dataset.bk, list.indexOf(b.dataset.bk) + Number(b.dataset.bmv));
+    render(true);
+    const again = document.querySelector(`[data-bmv="${b.dataset.bmv}"][data-bk="${b.dataset.bk}"]`);
+    if (again && !again.disabled) again.focus();
+  }
+  if (g && !g.disabled) {
+    const names = shelfGroups().map((x) => x.nome);
+    moveGroup(g.dataset.g, names.indexOf(g.dataset.g) + Number(g.dataset.gmv));
+    render(true);
+    const again = document.querySelector(`[data-gmv="${g.dataset.gmv}"][data-g="${g.dataset.g}"]`);
+    if (again && !again.disabled) again.focus();
+  }
+});
+// arrastar e soltar (mouse): livros dentro do mesmo grupo e grupos entre si
+let drag = null;
+document.addEventListener("dragstart", (e) => {
+  const s = e.target.closest && e.target.closest(".slot"), h = e.target.closest && e.target.closest("[data-gdrag]");
+  drag = s ? { kind: "b", g: s.dataset.g, id: s.dataset.bk } : h ? { kind: "g", id: h.dataset.gdrag } : null;
+  if (drag && e.dataTransfer) { e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", drag.id || "grupo"); }
+  if (drag) (s || h).classList.add("dragging");
+});
+document.addEventListener("dragend", () => { drag = null; document.querySelectorAll(".dragging,.dropat").forEach((x) => x.classList.remove("dragging", "dropat")); });
+document.addEventListener("dragover", (e) => {
+  if (!drag) return;
+  const s = e.target.closest(".slot"), h = e.target.closest("[data-gdrag]");
+  if ((drag.kind === "b" && s && s.dataset.g === drag.g) || (drag.kind === "g" && h)) {
+    e.preventDefault();
+    document.querySelectorAll(".dropat").forEach((x) => x.classList.remove("dropat"));
+    (s || h).classList.add("dropat");
+  }
+});
+document.addEventListener("drop", (e) => {
+  if (!drag) return;
+  const s = e.target.closest(".slot"), h = e.target.closest("[data-gdrag]");
+  if (drag.kind === "b" && s && s.dataset.g === drag.g && s.dataset.bk !== drag.id) {
+    const list = shelfGroups().find((x) => x.nome === drag.g).itens.map((p) => p.apelido);
+    e.preventDefault();
+    moveBook(drag.g, drag.id, list.indexOf(s.dataset.bk));
+  } else if (drag.kind === "g" && h && h.dataset.gdrag !== drag.id) {
+    const names = shelfGroups().map((x) => x.nome);
+    e.preventDefault();
+    moveGroup(drag.id, names.indexOf(h.dataset.gdrag));
+  } else return;
+  drag = null;
+  render(true);
+});
 window.addEventListener("hashchange", render);
 async function refresh() {
   try {
