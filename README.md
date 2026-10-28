@@ -20,3 +20,7 @@ Edite `monitor-config.json` para ajustar as trilhas, branches, contas vigiadas e
 cd D:\Monitor
 python -I -m unittest discover -s tests
 ```
+
+## Painel central via Brainiac (somente leitura)
+
+`python painel_brainiac.py` abre http://127.0.0.1:8766/ com o uso das contas, o estado dos agentes de cada projeto, as ultimas linhas do terminal do maestro, o plano de acao (`PLANO.md` com checklist `[x]` feito, `[~]` em andamento, `[ ]` proximo) e as branches pendentes/prontas para limpar. Le tudo pela API do Brainiac (`brainiac_source.py`), sem gastar token e sem enviar comando a agente. Projetos, maestros e branches em `projetos.json`. Visual no estilo Caderno de Campo do Brainiac.
