@@ -66,6 +66,8 @@ class SnapshotTests(unittest.TestCase):
             ],
             "terminals.scrollback": {"data": "\x1b[1m● trabalhando\x1b[0m"},
             "terminals.list": [{"id": "t1", "cols": 80, "rows": 24}],
+            "sidebarLayout.get": {"containers": [{"id": "g1", "name": "Grupo A", "kind": "group"}],
+                                  "locations": {"w1": "g1"}},
             "usage.getState": {"accounts": []},
         }
 
@@ -78,6 +80,16 @@ class SnapshotTests(unittest.TestCase):
         self.assertEqual(proj["agentes"][0]["terminal"], ["trabalhando"])
         self.assertEqual(proj["agentes"][0]["ultimo_turno"], "ha 2 h")
         self.assertFalse(snap["projects"][1]["encontrado"])
+        self.assertEqual(proj["grupo"], "Grupo A")
+        self.assertEqual(snap["grupos"], ["Grupo A"])
+
+    def test_grupos_da_barra_lateral(self):
+        layout = {"containers": [{"id": "a", "name": "Um"}, {"id": "b", "name": "Dois"}],
+                  "locations": {"w1": "b", "w2": "", "w3": "sumiu"}}
+        names, where = src.sidebar_groups(layout)
+        self.assertEqual(names, ["Um", "Dois"])
+        self.assertEqual(where, {"w1": "Dois", "w2": "", "w3": ""})
+        self.assertEqual(src.sidebar_groups(None), ([], {}))
 
     def test_brainiac_fora_do_ar_marca_erro_sem_quebrar(self):
         resp = {"workspaces.list": OSError("sem app")}

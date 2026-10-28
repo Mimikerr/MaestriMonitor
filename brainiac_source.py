@@ -147,6 +147,15 @@ def _terminal_size(workspace_id: str, terminal_id: str, brainiac_dir: Path | Non
     return 120, 40
 
 
+def sidebar_groups(layout: Any) -> tuple[list[str], dict[str, str]]:
+    """Grupos da barra lateral do Brainiac: nomes na ordem e workspaceId -> nome do grupo."""
+    layout = layout if isinstance(layout, dict) else {}
+    containers = [c for c in layout.get("containers", []) if isinstance(c, dict) and c.get("kind", "group") == "group"]
+    names = {c.get("id"): c.get("name", "") for c in containers}
+    where = {ws: names.get(gid, "") for ws, gid in (layout.get("locations") or {}).items()}
+    return [c.get("name", "") for c in containers if c.get("name")], where
+
+
 def build_snapshot(config: dict[str, Any], brainiac_dir: Path | None = None,
                    runner: Callable[..., Any] = subprocess.run, now: datetime | None = None) -> dict[str, Any]:
     now = now or datetime.now(timezone.utc)
@@ -162,11 +171,17 @@ def build_snapshot(config: dict[str, Any], brainiac_dir: Path | None = None,
         snap["usage"] = usage_rows(call("usage.getState", {}, brainiac_dir, runner))
     except BrainiacError:
         snap["usage"] = []
+    try:
+        group_names, group_of = sidebar_groups(call("sidebarLayout.get", {}, brainiac_dir, runner))
+    except BrainiacError:
+        group_names, group_of = [], {}
+    snap["grupos"] = group_names
     by_name = {w["name"]: w for w in workspaces}
     for proj in config.get("projetos", []):
         ws = by_name.get(proj.get("workspace", ""))
         item: dict[str, Any] = {"apelido": proj.get("apelido", ""), "nome": proj.get("workspace", ""),
-                                "cor": proj.get("cor", "#1F2A44"), "encontrado": ws is not None, "agentes": [], "plano": None, "branches": None}
+                                "cor": proj.get("cor", "#1F2A44"),
+                                "grupo": group_of.get(ws["id"], "") if ws else proj.get("grupo", ""), "encontrado": ws is not None, "agentes": [], "plano": None, "branches": None}
         if ws:
             for ag in (a for a in agents if a.get("workspaceId") == ws["id"]):
                 cfg = ag.get("config") or {}

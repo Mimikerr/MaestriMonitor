@@ -38,6 +38,9 @@ h1{margin:0;font:600 28px/1.15 'Fraunces',Georgia,serif}
 .bar.at i{background:var(--attn)}.bar.er i{background:var(--err)}
 .banner{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;padding:12px 16px;background:var(--surface);border:1px solid var(--line);border-left:6px solid var(--err);border-radius:8px}
 .banner b{font:600 16px 'Fraunces',Georgia,serif;color:var(--err)}
+.group{display:flex;flex-direction:column;gap:14px}
+.ghead{display:flex;align-items:baseline;gap:12px;padding:6px 4px 0;border-bottom:1px solid var(--line)}
+.ghead h2{margin:0;font:600 20px 'Fraunces',Georgia,serif}
 .shelf{display:flex;flex-direction:column}
 .books{display:flex;flex-wrap:wrap;gap:22px;align-items:flex-end;padding:10px 18px 0}
 .plank{height:12px;background:var(--line);border-top:2px solid var(--line2);border-radius:0 0 4px 4px}
@@ -79,6 +82,11 @@ pre.term{margin:0;padding:14px 16px;border-radius:6px;background:var(--ink);colo
 .nbhead{order:1}#composer{order:2}.spread{order:3}
 main.shelf #composer{order:-1}
 .desk{background:var(--surface);border:1px solid var(--line2);border-top-width:6px;border-radius:8px;box-shadow:var(--e2);padding:18px 22px 20px;display:flex;flex-direction:column;gap:14px}
+.deskhead{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.deskbody{display:flex;flex-direction:column;gap:14px}
+.deskbody[hidden]{display:none}
+.desk.closed{padding:10px 18px}
+.desk.closed .sub{display:none}
 .desk h3{margin:0;font:600 18px 'Fraunces',Georgia,serif}
 .desk .sub{font-size:13px;color:var(--muted);margin-top:-8px}
 .targets{display:flex;flex-wrap:wrap;gap:8px}
@@ -162,12 +170,30 @@ function book(p) {
 }
 function renderShelf() {
   $("title").textContent = "Estante de cadernos";
-  const ps = snap.projects, rows = [];
-  for (let i = 0; i < ps.length; i += 3) rows.push(ps.slice(i, i + 3));
+  const ps = snap.projects, per = perRow();
   const erros = ps.filter((p) => p.agentes.some((a) => a.status === "error")).length;
   $("banner").innerHTML = erros ? `<div class="banner"><b>Marcadores vermelhos</b><span class="mu">${erros} caderno(s) com agente em erro. Abra o caderno para ver o que houve.</span></div>` : "";
-  $("view").innerHTML = rows.map((r) => `<div class="shelf"><div class="books">${r.map(book).join("")}</div><div class="plank"></div></div>`).join("");
+  // um bloco por grupo da barra lateral do Brainiac: primeiro os cadernos sem grupo, depois cada grupo na ordem dele
+  const order = ["", ...(snap.grupos || [])];
+  const groups = order.map((g) => ({ nome: g, itens: ps.filter((p) => (p.grupo || "") === g) })).filter((g) => g.itens.length);
+  $("view").innerHTML = groups.map((g) => {
+    const rows = [];
+    for (let i = 0; i < g.itens.length; i += per) rows.push(g.itens.slice(i, i + per));
+    return `<section class="group" aria-label="${esc(g.nome || "Sem grupo")}"><div class="ghead"><h2>${esc(g.nome || "Sem grupo")}</h2><span class="mu">${g.itens.length} ${g.itens.length === 1 ? "caderno" : "cadernos"}</span></div>` +
+      rows.map((r) => `<div class="shelf"><div class="books">${r.map(book).join("")}</div><div class="plank"></div></div>`).join("") + "</section>";
+  }).join("");
+  shelfPer = per;
 }
+let shelfPer = 0;
+function perRow() {
+  const w = ($("view").clientWidth || document.querySelector("main").clientWidth || 1000) - 36;
+  return Math.max(1, Math.floor((w + 22) / (240 + 22)));
+}
+let resizeTimer = null;
+window.addEventListener("resize", () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => { if (!sel() && snap && snap.ok && perRow() !== shelfPer) render(true); }, 150);
+});
 function plan(pl) {
   if (!pl || !pl.total) return '<div class="empty">Sem PLANO.md neste caderno ainda.</div>';
   return `<div class="prog"><i style="width:${Math.round((pl.done / pl.total) * 100)}%"></i></div>` +
@@ -236,16 +262,38 @@ function buildComposer() {
   const chips = p ? "" : `<div class="targets" role="group" aria-label="Escolha o caderno">${snap.projects.filter((x) => x.encontrado).map((x) =>
     `<button type="button" class="tg" data-pick="${esc(x.apelido)}" aria-pressed="false"><i style="background:${esc(x.cor)}"></i>${esc(x.nome)}</button>`).join("")}</div>`;
   $("composer").innerHTML = `<section class="desk" style="border-top-color:${p ? esc(p.cor) : "var(--line2)"}" aria-label="Enviar ordem">
-    <h3 id="desk-title"></h3><div class="sub" id="desk-sub"></div>${chips}
+    <div class="deskhead"><div><h3 id="desk-title"></h3><div class="sub" id="desk-sub"></div></div>
+      <button type="button" class="btn" id="desk-toggle" aria-controls="deskbody" aria-expanded="true"></button></div>
+    <div class="deskbody" id="deskbody">${chips}
     <form class="sheet" id="sheet" autocomplete="off">
       <textarea id="ord" maxlength="2000" rows="3" aria-label="Texto da ordem"></textarea>
       <button class="btn pri" type="submit">Enviar ordem</button>
     </form>
     <div class="hint">Enter envia para conferência. Nada vai ao maestro antes de você confirmar.</div>
     <div id="ord-confirm" class="confirm" hidden></div>
-    <div id="ord-result" role="status" aria-live="polite"></div></section>`;
+    <div id="ord-result" role="status" aria-live="polite"></div></div></section>`;
   pick = p ? p.apelido : null;
+  applyDesk();
 }
+const deskKey = () => (sel() ? "nb" : "shelf");
+function deskIsOpen() {
+  try { const v = localStorage.getItem("painel.mesa." + deskKey()); if (v !== null) return v === "1"; } catch (e) { /* sem armazenamento */ }
+  return deskKey() === "nb";
+}
+function applyDesk() {
+  const open = deskIsOpen();
+  $("deskbody").hidden = !open;
+  document.querySelector(".desk").classList.toggle("closed", !open);
+  const t = $("desk-toggle");
+  t.textContent = open ? "Recolher ▴" : "Abrir ▾";
+  t.setAttribute("aria-expanded", String(open));
+}
+document.addEventListener("click", (e) => {
+  if (!e.target.closest("#desk-toggle")) return;
+  try { localStorage.setItem("painel.mesa." + deskKey(), deskIsOpen() ? "0" : "1"); } catch (err) { /* sem armazenamento */ }
+  applyDesk();
+  if (deskIsOpen() && $("ord") && !$("ord").disabled) $("ord").focus();
+});
 function syncComposer() {
   if (builtFor !== sel() || !$("sheet")) buildComposer();
   const p = targetOf(pick);
