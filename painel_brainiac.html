@@ -111,6 +111,29 @@ pre.term{margin:0;padding:14px 16px;border-radius:6px;background:var(--ink);colo
 .top{order:-3}#usage{order:-2}
 .nbhead{order:1}#composer{order:2}.spread{order:3}
 main.shelf #composer{order:-1}
+[hidden]{display:none!important}
+/* caderno aberto: título só uma vez, conversa na altura da tela e a ordem numa barra fixa no rodapé */
+main:not(.shelf) .top{justify-content:flex-end}
+main:not(.shelf) .top>div:first-child{display:none}
+main:not(.shelf){gap:12px;padding-top:14px}
+main:not(.shelf) #composer{order:4;position:sticky;bottom:0;z-index:5;background:var(--bg);padding:6px 0 10px}
+main:not(.shelf) .desk{padding:10px 14px 12px;border-top-width:3px;gap:8px}
+main:not(.shelf) .deskhead{display:none}
+main:not(.shelf) .deskbody{gap:8px}
+main:not(.shelf) .sheet textarea{min-height:56px}
+main:not(.shelf) .sheet .btn.pri{min-height:44px}
+main:not(.shelf) .hint{display:none}
+main:not(.shelf) .spread section{padding:14px 18px;gap:14px}
+main:not(.shelf){padding-bottom:4px}
+main:not(.shelf) .spread{height:calc(100vh - 318px);min-height:440px;overflow:hidden;flex-wrap:nowrap}
+main:not(.shelf) .spread section{min-height:0;overflow:auto}
+main:not(.shelf) .spread section:first-child{overflow:hidden}
+main:not(.shelf) .spread section:first-child>.sec:first-child{flex:1;min-height:0}
+main:not(.shelf) .spread section:first-child>.sec:last-child{max-height:150px;overflow:auto;flex:none}
+main:not(.shelf) .replies{flex:1;max-height:none;min-height:140px}
+@media (max-width:900px){main:not(.shelf) .spread{height:auto;flex-wrap:wrap;overflow:visible}main:not(.shelf) .replies{max-height:60vh}}
+main:not(.shelf) .ag{padding:5px 0}
+main:not(.shelf) .step{padding:4px 8px}
 .desk{background:var(--surface);border:1px solid var(--line2);border-top-width:6px;border-radius:8px;box-shadow:var(--e2);padding:18px 22px 20px;display:flex;flex-direction:column;gap:14px}
 .deskhead{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
 .deskbody{display:flex;flex-direction:column;gap:14px}
@@ -370,6 +393,7 @@ function buildComposer() {
 }
 const deskKey = () => (sel() ? "nb" : "shelf");
 function deskIsOpen() {
+  if (sel()) return true; // dentro do caderno a barra de ordem é sempre visível
   try { const v = localStorage.getItem("painel.mesa." + deskKey()); if (v !== null) return v === "1"; } catch (e) { /* sem armazenamento */ }
   return deskKey() === "nb";
 }
@@ -400,7 +424,9 @@ function syncComposer() {
   $("desk-sub").textContent = p ? (online(p) ? `Canal direto com o maestro de ${p.nome}.` : `O maestro de ${p.nome} está parado. Inicie-o no Brainiac para enviar.`)
     : "Escolha o caderno e escreva a ordem.";
   const ord = $("ord");
-  ord.placeholder = p ? `O que ${m ? m.nome : "o maestro"} deve fazer?` : "Escolha um caderno acima";
+  ord.placeholder = !p ? "Escolha um caderno acima"
+    : online(p) ? `Ordem para ${m ? m.nome : "o maestro"} (${p.nome}). Enter envia para conferência.`
+      : `O maestro de ${p.nome} está parado. Inicie-o no Brainiac para enviar.`;
   ord.disabled = !p || !online(p);
   $("sheet").querySelector("button").disabled = !p || !online(p);
 }
