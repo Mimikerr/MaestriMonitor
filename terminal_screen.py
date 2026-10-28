@@ -301,3 +301,79 @@ def render_response_cards(raw: str, cols: int = 120, rows: int = 40, keep: int =
     scr.feed(raw or "")
     blocks = extract_blocks([ln[:240] for ln in scr.lines()])
     return [structure_block(b) for b in blocks[-keep:]]
+
+
+_SEP = re.compile(r"^[─━═\-]{10,}\s*$")
+_PROMPT = re.compile(r"^❯\s*(.*)$")
+_SPINNER = re.compile(r"^\s*[✻✢✶✳✽·*]\s+(\S.*(?:esc to interrupt|…\s*\(\d+s|\(\d+s\s*·).*)$")
+
+
+def _neighbor(lines: list[str], i: int, step: int) -> str:
+    j = i + step
+    while 0 <= j < len(lines) and not lines[j].strip():
+        j += step
+    return lines[j] if 0 <= j < len(lines) else ""
+
+
+def extract_events(lines: list[str]) -> list[dict]:
+    """Ordens enviadas (`❯ texto`, fora da caixa de entrada) e respostas, na ordem da tela."""
+    events: list[dict] = []
+    cur: dict | None = None
+    for i, raw in enumerate(lines):
+        ln = raw.replace("\xa0", " ")
+        pm = _PROMPT.match(ln)
+        if pm:
+            if _SEP.match(_neighbor(lines, i, -1)) and _SEP.match(_neighbor(lines, i, 1)):
+                cur = None  # caixa de entrada atual, nao e uma ordem ja enviada
+                continue
+            cur = {"k": "ordem", "lines": [pm.group(1).strip()]} if pm.group(1).strip() else None
+            if cur:
+                events.append(cur)
+            continue
+        bm = _BULLET.match(ln)
+        if bm:
+            cur = None
+            if not _TOOL_CALL.match(bm.group(1)):
+                cur = {"k": "resp", "lines": [bm.group(1)]}
+                events.append(cur)
+            continue
+        if cur is None:
+            continue
+        if not ln.strip():
+            if cur["k"] == "ordem":
+                cur = None
+            else:
+                cur["lines"].append("")
+            continue
+        indent = len(ln) - len(ln.lstrip(" "))
+        if indent == 0 or _TOOL_SUMMARY.match(ln):
+            cur = None
+        elif indent <= MAX_INDENT:
+            cur["lines"].append(ln[2:] if ln.startswith("  ") else ln)
+    for e in events:
+        while e["lines"] and not e["lines"][-1].strip():
+            e["lines"].pop()
+    return [e for e in events if e["lines"]]
+
+
+def detect_activity(lines: list[str]) -> str:
+    """Texto da linha de status quando o agente esta trabalhando (ex.: 'Cooking… (12s · esc to interrupt)')."""
+    for ln in reversed(lines[-14:]):
+        m = _SPINNER.match(ln)
+        if m:
+            return re.sub(r"\s+", " ", m.group(1)).strip()[:160]
+    return ""
+
+
+def render_conversation(raw: str, cols: int = 120, rows: int = 40) -> tuple[list[dict], str]:
+    """Eventos da tela (ordens e respostas ja estruturadas) e a atividade atual, se houver."""
+    scr = Screen(cols, rows)
+    scr.feed(raw or "")
+    lines = [ln[:240] for ln in scr.lines()]
+    events = []
+    for e in extract_events(lines):
+        if e["k"] == "ordem":
+            events.append({"k": "ordem", "x": " ".join(s.strip() for s in e["lines"])})
+        else:
+            events.append({"k": "resp", "items": structure_block(e["lines"])})
+    return events, detect_activity(lines)

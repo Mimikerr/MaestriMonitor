@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
-from terminal_screen import render_response_cards, render_responses
+from terminal_screen import render_conversation, render_responses
 
 ROOT = Path(__file__).resolve().parent
 CONFIG = ROOT / "projetos.json"
@@ -157,7 +157,8 @@ def sidebar_groups(layout: Any) -> tuple[list[str], dict[str, str]]:
 
 
 def build_snapshot(config: dict[str, Any], brainiac_dir: Path | None = None,
-                   runner: Callable[..., Any] = subprocess.run, now: datetime | None = None) -> dict[str, Any]:
+                   runner: Callable[..., Any] = subprocess.run, now: datetime | None = None,
+                   log: Any = None) -> dict[str, Any]:
     now = now or datetime.now(timezone.utc)
     snap: dict[str, Any] = {"generated_at": now.isoformat(), "ok": True, "error": None,
                             "projects": [], "usage": []}
@@ -189,13 +190,15 @@ def build_snapshot(config: dict[str, Any], brainiac_dir: Path | None = None,
                 is_maestro = ag.get("name") == proj.get("maestro")
                 row = {"nome": ag.get("name", ""), "provider": ag.get("provider", ""),
                        "status": ag.get("status", ""), "erro": ag.get("error"), "maestro": is_maestro,
-                       "ultimo_turno": _relative(last, now), "terminal": [], "respostas": []}
+                       "ultimo_turno": _relative(last, now), "terminal": [], "conversa": [], "ocupado": False, "atividade": ""}
                 if is_maestro and ag.get("terminalId") and ag.get("status") == "running":
                     try:
                         cols, rows = _terminal_size(ws["id"], ag["terminalId"], brainiac_dir, runner)
                         sb = call("terminals.scrollback", {"id": ag["terminalId"]}, brainiac_dir, runner)
                         row["terminal"] = render_responses(sb.get("data", ""), cols, rows, keep=60)
-                        row["respostas"] = render_response_cards(sb.get("data", ""), cols, rows, keep=6)
+                        events, activity = render_conversation(sb.get("data", ""), cols, rows)
+                        row["conversa"] = log.update(ag["terminalId"], events) if log else events
+                        row["ocupado"], row["atividade"] = bool(activity), activity
                     except BrainiacError:
                         pass
                 item["agentes"].append(row)

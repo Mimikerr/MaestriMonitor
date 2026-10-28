@@ -13,18 +13,20 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import brainiac_source as source
+from conversa import ConversationLog
 
 ROOT = Path(__file__).resolve().parent
 PAGE = ROOT / "painel_brainiac.html"
-CACHE_SECONDS = 5
+CACHE_SECONDS = 2
 _lock = threading.Lock()
 _cache: dict = {"at": 0.0, "body": b"{}"}
+_log = ConversationLog(ROOT / "runtime" / "conversas.json")
 
 
 def snapshot_json() -> bytes:
     with _lock:
         if time.monotonic() - _cache["at"] > CACHE_SECONDS:
-            data = source.build_snapshot(source.load_config())
+            data = source.build_snapshot(source.load_config(), log=_log)
             _cache.update(at=time.monotonic(), body=json.dumps(data, ensure_ascii=False).encode("utf-8"))
         return _cache["body"]
 
@@ -92,10 +94,22 @@ class Handler(BaseHTTPRequestHandler):
         pass
 
 
+def _poll() -> None:
+    """Le o Brainiac de tempos em tempos mesmo sem navegador aberto, para nao perder respostas
+    que saem da tela do terminal."""
+    while True:
+        try:
+            snapshot_json()
+        except Exception:  # noqa: BLE001 - o leitor nunca derruba o servidor
+            pass
+        time.sleep(3)
+
+
 def main() -> int:
     port = int(source.load_config().get("porta", 8766))
     server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
     print(f"Painel em http://127.0.0.1:{port}/")
+    threading.Thread(target=_poll, daemon=True).start()
     try:
         server.serve_forever()
     except KeyboardInterrupt:

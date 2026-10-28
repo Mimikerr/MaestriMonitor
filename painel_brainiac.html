@@ -78,6 +78,15 @@ pre.term{margin:0;padding:14px 16px;border-radius:6px;background:var(--ink);colo
 .replies{display:flex;flex-direction:column;gap:10px;max-height:min(72vh,620px);overflow:auto;padding:2px 6px 2px 2px}
 .reply{border:1px solid var(--line);border-radius:8px;background:var(--surface2);padding:12px 14px;display:flex;flex-direction:column;gap:8px}
 .reply.old{opacity:.7}
+.reply.ask{background:var(--surface3);border-color:var(--line2);width:calc(100% - 28px);align-self:flex-end}
+.replies{overflow-x:hidden}
+.reply.ask .rh{color:var(--fg)}
+.reply.work{border:1px dashed var(--attn);background:var(--surface)}
+.reply.work .rh{color:var(--attn)}
+.reply .wk{font:12.5px/1.5 'JetBrains Mono',monospace;color:var(--muted)}
+.dots::after{content:"";display:inline-block;width:1.4em;text-align:left;animation:dots 1.2s steps(4,end) infinite}
+@keyframes dots{0%{content:""}25%{content:"."}50%{content:".."}75%{content:"..."}}
+@media (prefers-reduced-motion:reduce){.dots::after{animation:none;content:"..."}}
 .reply.last{border-left:5px solid var(--seal);background:var(--surface);box-shadow:var(--e1)}
 .reply .rh{display:flex;justify-content:space-between;gap:8px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
 .reply.last .rh{color:var(--seal)}
@@ -164,6 +173,7 @@ const resets = (iso) => {
 const maestro = (p) => p.agentes.find((a) => a.maestro);
 function estado(p) {
   if (p.agentes.some((a) => a.status === "error")) return ["er", "com erro"];
+  if (p.agentes.some((a) => a.status === "running" && a.ocupado)) return ["at", "trabalhando"];
   if (p.agentes.some((a) => a.status === "running")) return ["ok", "em andamento"];
   return ["id", "parado"];
 }
@@ -260,8 +270,9 @@ function branches(b) {
     (b.limpar.length ? `<div class="lbl" style="margin-top:6px">Prontas para limpar</div>${chips(b.limpar)}` : "");
 }
 // uma resposta do agente: parágrafos e listas já reorganizados pelo servidor
-function reply(items, i, total) {
-  const last = i === total - 1;
+function reply(e, n, total) {
+  if (e.k === "ordem") return `<article class="reply ask"><div class="rh"><span>Ordem enviada</span></div><p>${esc(e.x)}</p></article>`;
+  const items = e.items || [], last = n === total;
   let html = "", list = null;
   const close = () => { if (list) { html += `</${list}>`; list = null; } };
   items.forEach((it) => {
@@ -272,15 +283,25 @@ function reply(items, i, total) {
     } else { close(); html += `<p>${esc(it.x)}</p>`; }
   });
   close();
-  return `<article class="reply ${last ? "last" : "old"}"><div class="rh"><span>${last ? "Última resposta" : "Resposta anterior"}</span><span>${i + 1} de ${total}</span></div>${html}</article>`;
+  return `<article class="reply ${last ? "last" : "old"}"><div class="rh"><span>${last ? "Última resposta" : "Resposta anterior"}</span><span>${n} de ${total}</span></div>${html}</article>`;
+}
+function conversation(m) {
+  const list = (m && m.conversa) || [];
+  const total = list.filter((e) => e.k === "resp").length;
+  let n = 0;
+  const cards = list.map((e) => reply(e, e.k === "resp" ? ++n : 0, total)).join("");
+  const work = m && m.ocupado ? `<article class="reply work" aria-live="polite"><div class="rh"><span>Trabalhando<i class="dots" aria-hidden="true"></i></span></div><p class="wk">${esc(m.atividade || "em andamento")}</p></article>` : "";
+  return cards || work ? `<div class="replies">${cards}${work}</div>` : "";
 }
 function renderNotebook(p) {
   $("title").textContent = p.nome;
   $("banner").innerHTML = "";
   if (!p.encontrado) { $("view").innerHTML = `<button class="btn" data-back>← Estante</button><div class="empty">Workspace "${esc(p.nome)}" não encontrado no Brainiac.</div>`; return; }
-  const m = maestro(p), [mc, ml] = m ? ST[m.status] || ["id", m.status] : ["id", "sem maestro"];
-  const cards = m && m.respostas && m.respostas.length ? m.respostas : null;
-  const term = cards ? `<div class="replies">${cards.map((c, i) => reply(c, i, cards.length)).join("")}</div>`
+  const m = maestro(p);
+  let [mc, ml] = m ? ST[m.status] || ["id", m.status] : ["id", "sem maestro"];
+  if (m && m.status === "running" && m.ocupado) [mc, ml] = ["at", "trabalhando"];
+  const html = conversation(m);
+  const term = html ? html
     : `<div class="empty">${m && m.status === "running" ? "Sem respostas ainda." : "Maestro parado. Sem respostas para mostrar."}</div>`;
   $("view").innerHTML = `
     <div class="nbhead"><button class="btn" data-back>← Estante</button><span class="tag" aria-hidden="true" style="background:${esc(p.cor)}"></span>
