@@ -29,25 +29,29 @@
       "apelido": "express",
       "cor": "#2B6476",
       "workspace": "Softcom Smart Express",
-      "maestro": "Caravela"
+      "maestro": "Caravela",
+      "plano": "PLANO.md"
     },
     {
       "apelido": "nlm",
       "cor": "#1F2A44",
       "workspace": "No Lost Media",
-      "maestro": "Claude Code"
+      "maestro": "Claude Code",
+      "plano": "PLANO.md"
     },
     {
       "apelido": "launcher",
       "cor": "#6B3A6B",
       "workspace": "NLM Launcher",
-      "maestro": "Forja"
+      "maestro": "Forja",
+      "plano": "PLANO.md"
     },
     {
       "apelido": "player",
       "cor": "#8C6A00",
       "workspace": "NLM Player",
-      "maestro": "Lanterna"
+      "maestro": "Lanterna",
+      "plano": "PLANO.md"
     }
   ]
 }
