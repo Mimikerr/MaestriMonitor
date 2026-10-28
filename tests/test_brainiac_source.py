@@ -65,6 +65,7 @@ class SnapshotTests(unittest.TestCase):
                  "terminalId": "t1", "config": {"metadata": {"lastTurnEndedAt": "2026-10-28T12:00:00Z"}}},
             ],
             "terminals.scrollback": {"data": "\x1b[1mtrabalhando\x1b[0m"},
+            "terminals.list": [{"id": "t1", "cols": 80, "rows": 24}],
             "usage.getState": {"accounts": []},
         }
 

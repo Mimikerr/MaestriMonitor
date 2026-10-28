@@ -14,6 +14,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
+from terminal_screen import render_terminal
+
 ROOT = Path(__file__).resolve().parent
 CONFIG = ROOT / "projetos.json"
 ANSI = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[()][A-Za-z0-9]|\x1b[=>]")
@@ -133,6 +135,18 @@ def usage_rows(state: Any) -> list[dict[str, Any]]:
     return rows
 
 
+def _terminal_size(workspace_id: str, terminal_id: str, brainiac_dir: Path | None,
+                   runner: Callable[..., Any]) -> tuple[int, int]:
+    """Colunas e linhas reais do terminal (a tela so e reconstruida certo com o tamanho certo)."""
+    try:
+        for t in call("terminals.list", {"workspaceId": workspace_id}, brainiac_dir, runner):
+            if t.get("id") == terminal_id:
+                return int(t.get("cols") or 120), int(t.get("rows") or 40)
+    except (BrainiacError, TypeError, ValueError):
+        pass
+    return 120, 40
+
+
 def build_snapshot(config: dict[str, Any], brainiac_dir: Path | None = None,
                    runner: Callable[..., Any] = subprocess.run, now: datetime | None = None) -> dict[str, Any]:
     now = now or datetime.now(timezone.utc)
@@ -163,8 +177,9 @@ def build_snapshot(config: dict[str, Any], brainiac_dir: Path | None = None,
                        "ultimo_turno": _relative(last, now), "terminal": []}
                 if is_maestro and ag.get("terminalId") and ag.get("status") == "running":
                     try:
+                        cols, rows = _terminal_size(ws["id"], ag["terminalId"], brainiac_dir, runner)
                         sb = call("terminals.scrollback", {"id": ag["terminalId"]}, brainiac_dir, runner)
-                        row["terminal"] = clean_terminal(sb.get("data", ""))
+                        row["terminal"] = render_terminal(sb.get("data", ""), cols, rows, keep=18)
                     except BrainiacError:
                         pass
                 item["agentes"].append(row)
