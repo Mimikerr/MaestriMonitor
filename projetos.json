@@ -1,13 +1,13 @@
 {
   "porta": 8766,
   "projetos": [
-    {"apelido": "provisioner", "workspace": "Softcom Smart Provisioner", "maestro": "Batuta",
+    {"apelido": "provisioner", "cor": "#5F6B2A", "workspace": "Softcom Smart Provisioner", "maestro": "Batuta",
      "plano": "PLANO.md", "branch_integracao": "DEV", "branch_release": "main"},
-    {"apelido": "automation", "workspace": "Softcom Smart Automation", "maestro": "Claude Code",
+    {"apelido": "automation", "cor": "#A4492A", "workspace": "Softcom Smart Automation", "maestro": "Claude Code",
      "plano": "PLANO.md", "branch_integracao": "dev", "branch_release": "main"},
-    {"apelido": "express", "workspace": "Softcom Smart Express", "maestro": "Caravela"},
-    {"apelido": "nlm", "workspace": "No Lost Media", "maestro": "Claude Code"},
-    {"apelido": "launcher", "workspace": "NLM Launcher", "maestro": "Forja"},
-    {"apelido": "player", "workspace": "NLM Player", "maestro": "Lanterna"}
+    {"apelido": "express", "cor": "#2B6476", "workspace": "Softcom Smart Express", "maestro": "Caravela"},
+    {"apelido": "nlm", "cor": "#1F2A44", "workspace": "No Lost Media", "maestro": "Claude Code"},
+    {"apelido": "launcher", "cor": "#6B3A6B", "workspace": "NLM Launcher", "maestro": "Forja"},
+    {"apelido": "player", "cor": "#8C6A00", "workspace": "NLM Player", "maestro": "Lanterna"}
   ]
 }

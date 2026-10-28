@@ -152,7 +152,7 @@ def build_snapshot(config: dict[str, Any], brainiac_dir: Path | None = None,
     for proj in config.get("projetos", []):
         ws = by_name.get(proj.get("workspace", ""))
         item: dict[str, Any] = {"apelido": proj.get("apelido", ""), "nome": proj.get("workspace", ""),
-                                "encontrado": ws is not None, "agentes": [], "plano": None, "branches": None}
+                                "cor": proj.get("cor", "#1F2A44"), "encontrado": ws is not None, "agentes": [], "plano": None, "branches": None}
         if ws:
             for ag in (a for a in agents if a.get("workspaceId") == ws["id"]):
                 cfg = ag.get("config") or {}

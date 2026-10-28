@@ -5,129 +5,200 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Painel central · Brainiac</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,500;0,600;1,400&family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600&family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
 <style>
-:root{--bg:#F4EFE4;--surface:#FFFDF7;--surface2:#FAF6EC;--surface3:#EFE8D8;--line:#DDD3BF;--line2:#C6B99F;--fg:#1F2A44;--muted:#5C5446;--ink:#1F2A44;--on-ink:#FFFDF7;--seal:#8A3B12;--ok:#2F6B3A;--attn:#9A5B00;--err:#A8241C;--idle:#6E6555;--e1:0 1px 0 rgba(60,40,10,.08);--e2:0 1px 0 rgba(60,40,10,.06),0 10px 24px -12px rgba(60,40,10,.35)}
-@media (prefers-color-scheme:dark){:root{--bg:#12151C;--surface:#1A1E27;--surface2:#212633;--surface3:#2A3040;--line:#343B4B;--line2:#4A5266;--fg:#EDE6D6;--muted:#B3AA98;--ink:#EDE6D6;--on-ink:#12151C;--seal:#E07A4F;--ok:#7DC28A;--attn:#E5B04A;--err:#F07B6F;--idle:#998F7C;--e1:0 1px 0 rgba(0,0,0,.4);--e2:0 14px 30px -12px rgba(0,0,0,.75)}}
+:root{--bg:#F4EFE4;--surface:#FFFDF7;--surface2:#FAF6EC;--surface3:#EFE8D8;--line:#DDD3BF;--line2:#C6B99F;--fg:#1F2A44;--muted:#5C5446;--ink:#1F2A44;--on-ink:#FFFDF7;--seal:#8A3B12;--ok:#2F6B3A;--attn:#9A5B00;--err:#A8241C;--idle:#6E6555;--e1:0 1px 0 rgba(60,40,10,.08);--e2:0 10px 24px -12px rgba(60,40,10,.35)}
+@media (prefers-color-scheme:dark){:root{--bg:#12151C;--surface:#1A1E27;--surface2:#212633;--surface3:#2A3040;--line:#343B4B;--line2:#4A5266;--fg:#EDE6D6;--muted:#B3AA98;--ink:#1F2A44;--on-ink:#EDE6D6;--seal:#E07A4F;--ok:#7DC28A;--attn:#E5B04A;--err:#F07B6F;--idle:#998F7C;--e1:0 1px 0 rgba(0,0,0,.4);--e2:0 14px 30px -12px rgba(0,0,0,.75)}}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--fg);font:13px/1.45 'Instrument Sans',system-ui,sans-serif}
+body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.45 'Instrument Sans',system-ui,sans-serif}
+button{font:inherit;color:inherit}
 .ser{font-family:'Fraunces',Georgia,serif}.mono{font-family:'JetBrains Mono',ui-monospace,Consolas,monospace}
-.lbl{font-size:11px;line-height:14px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.lbl{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
 .mu{color:var(--muted)}
-main{max-width:1500px;margin:0 auto;padding:22px clamp(14px,3vw,32px) 40px;display:flex;flex-direction:column;gap:20px}
-header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:10px 24px;padding-bottom:14px;border-bottom:1px solid var(--line)}
-h1{margin:0;font:600 26px/1.15 'Fraunces',Georgia,serif}
-.stamp{display:inline-flex;align-items:center;gap:5px;height:20px;padding:0 7px;border:1.5px solid currentColor;border-radius:3px;font:700 10.5px/1 'Instrument Sans',sans-serif;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap;color:var(--muted)}
+main{max-width:1500px;margin:0 auto;padding:24px clamp(16px,3vw,36px) 48px;display:flex;flex-direction:column;gap:18px}
+.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px 24px}
+h1{margin:0;font:600 28px/1.15 'Fraunces',Georgia,serif}
+.row{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+.btn{display:inline-flex;align-items:center;gap:10px;min-height:44px;padding:0 14px;border-radius:6px;border:1px solid var(--line2);background:var(--surface);cursor:pointer;font-weight:500;font-size:13px}
+.btn:hover{background:var(--surface3)}
+.btn:focus-visible,.book:focus-visible{outline:2px solid #2F55D4;outline-offset:2px}
+.stamp{display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 7px;border:1.5px solid currentColor;border-radius:3px;font:700 10.5px/1 'Instrument Sans',sans-serif;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap;color:var(--muted)}
+.stamp.big{height:24px;padding:0 9px;font-size:11px}
 .stamp.ok{color:var(--ok)}.stamp.at{color:var(--attn)}.stamp.er{color:var(--err)}.stamp.id{color:var(--idle)}
 .sd{width:7px;height:7px;border-radius:50%;background:currentColor;flex:none}
-.live{display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
-.banner{padding:12px 16px;border:1px solid var(--err);border-left-width:6px;border-radius:6px;background:var(--surface);color:var(--err);font-weight:600}
-.usage{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
-.card{background:var(--surface);border:1px solid var(--line);border-radius:8px;box-shadow:var(--e1);display:flex;flex-direction:column;min-width:0}
-.card-h{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--line);flex-wrap:wrap}
-.card-h h2{margin:0;font:600 17px/22px 'Fraunces',Georgia,serif}
-.card-b{padding:14px 16px;display:flex;flex-direction:column;gap:14px}
-.meter{display:flex;flex-direction:column;gap:5px}
-.meter .row{display:flex;justify-content:space-between;gap:8px;font-size:12px}
-.bar{height:6px;border-radius:3px;background:var(--surface3);overflow:hidden}
+.live{min-height:44px;padding:0 12px;border-radius:6px;font-size:11px;height:auto}
+.usage{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));background:var(--surface);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.usage[hidden]{display:none}
+.usage>div{padding:14px 18px;border-right:1px solid var(--line);display:flex;flex-direction:column;gap:10px;min-width:0}
+.usage h3{margin:0;font:600 16px 'Fraunces',Georgia,serif}
+.m{display:grid;grid-template-columns:1fr 44px;gap:4px 10px;align-items:center;font-size:12px}
+.m .bar{grid-column:1/-1}
+.bar{height:5px;border-radius:3px;background:var(--surface3);overflow:hidden}
 .bar i{display:block;height:100%;background:var(--ok);border-radius:3px}
 .bar.at i{background:var(--attn)}.bar.er i{background:var(--err)}
-.projects{display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));gap:16px}
-.agents{display:flex;flex-direction:column}
-.ag{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px dashed var(--line)}
-.ag:last-child{border-bottom:0}
-.ag .n{flex:1;min-width:0;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.ag.maestro .n{font-weight:700}
-.ag .p{font-size:11px;color:var(--muted)}
-.err-note{font-size:12px;color:var(--err);padding:2px 0 6px}
-pre.term{margin:0;padding:10px 12px;background:var(--ink);color:var(--on-ink);border-radius:5px;font:11.5px/1.5 'JetBrains Mono',monospace;white-space:pre-wrap;word-break:break-word;max-height:150px;overflow:auto}
-.steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:5px}
-.steps li{display:flex;gap:8px;align-items:flex-start}
-.chk{width:15px;height:15px;border:1.5px solid var(--line2);border-radius:3px;flex:none;margin-top:2px;display:grid;place-items:center;font-size:10px;line-height:1}
-.steps .done{color:var(--muted)}.steps .done .chk{background:var(--ok);border-color:var(--ok);color:var(--surface)}
-.steps .doing{font-weight:600}.steps .doing .chk{border-color:var(--seal);background:var(--seal);color:var(--surface)}
-.prog{height:4px;background:var(--surface3);border-radius:2px;overflow:hidden}.prog i{display:block;height:100%;background:var(--ok)}
+.banner{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;padding:12px 16px;background:var(--surface);border:1px solid var(--line);border-left:6px solid var(--err);border-radius:8px}
+.banner b{font:600 16px 'Fraunces',Georgia,serif;color:var(--err)}
+.shelf{display:flex;flex-direction:column}
+.books{display:flex;flex-wrap:wrap;gap:22px;align-items:flex-end;padding:10px 18px 0}
+.plank{height:12px;background:var(--line);border-top:2px solid var(--line2);border-radius:0 0 4px 4px}
+.book{position:relative;display:flex;align-items:stretch;width:240px;height:320px;padding:0;text-align:left;cursor:pointer;border:1px solid var(--line2);border-bottom:0;border-radius:6px 6px 0 0;background:var(--surface);box-shadow:var(--e1);overflow:visible}
+.book:hover{transform:translateY(-4px);box-shadow:var(--e2)}
+.spine{width:34px;flex:none;border-radius:5px 0 0 0;display:flex;align-items:center;justify-content:center;color:#FFFDF7;font:600 12px 'JetBrains Mono',monospace;letter-spacing:.08em}
+.spine span{writing-mode:vertical-rl;transform:rotate(180deg);white-space:nowrap}
+.cover{flex:1;min-width:0;display:flex;flex-direction:column;gap:10px;padding:16px 16px 14px}
+.cover h3{margin:0;font:600 20px/1.2 'Fraunces',Georgia,serif}
+.facts{display:flex;flex-direction:column;gap:5px;font-size:12.5px;color:var(--muted)}
+.facts strong{color:var(--fg)}
+.open-l{margin-top:auto;font-size:12px;font-weight:600}
+.ribbon{position:absolute;top:-8px;right:18px;width:18px;height:44px;background:var(--err);clip-path:polygon(0 0,100% 0,100% 100%,50% 78%,0 100%)}
+.nbhead{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px}
+.nbhead h2{margin:0;font:600 26px 'Fraunces',Georgia,serif}
+.tag{width:10px;height:36px;border-radius:2px}
+.spread{display:flex;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line2);border-top-width:6px;border-radius:8px;box-shadow:var(--e2)}
+.spread section{flex:1 1 420px;min-width:0;padding:20px 24px;display:flex;flex-direction:column;gap:20px}
+.spread section:first-child{border-right:1px solid var(--line)}
+.sec{display:flex;flex-direction:column;gap:8px}
+pre.term{margin:0;padding:14px 16px;border-radius:6px;background:var(--ink);color:#EDE6D6;font:12.5px/1.6 'JetBrains Mono',monospace;white-space:pre-wrap;word-break:break-word;min-height:110px;max-height:260px;overflow:auto}
+.empty{padding:20px 16px;border:1px dashed var(--line2);border-radius:6px;color:var(--muted);font-style:italic}
+.ag{display:grid;grid-template-columns:92px 1fr;gap:4px 12px;align-items:center;padding:9px 0;border-top:1px dashed var(--line)}
+.ag .nm{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 10px;min-width:0}
+.ag .er{grid-column:1/-1;font-size:12px;color:var(--err)}
+.step{display:flex;gap:10px;align-items:flex-start;padding:6px 8px;border-radius:5px}
+.step.doing{background:var(--surface2);font-weight:600}.step.done{color:var(--muted)}
+.chk{width:16px;height:16px;flex:none;margin-top:2px;border-radius:3px;border:1.5px solid var(--line2);color:var(--surface);font-size:11px;line-height:13px;text-align:center}
+.done .chk{background:var(--ok);border-color:var(--ok)}.doing .chk{background:var(--seal);border-color:var(--seal)}
+.tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.tile{padding:14px 16px;border-right:1px solid var(--surface3);background:var(--surface2);display:flex;flex-direction:column;gap:2px}
+.tile b{font:600 32px/1.1 'Fraunces',Georgia,serif}
 .chips{display:flex;flex-wrap:wrap;gap:5px}
 .chip{padding:2px 8px;border:1px solid var(--line2);border-radius:4px;background:var(--surface2);font:11px 'JetBrains Mono',monospace}
-.sec-t{display:flex;align-items:center;justify-content:space-between;gap:8px}
-.empty{color:var(--muted);font-style:italic}
+.prog{height:5px;border-radius:3px;background:var(--surface3);overflow:hidden}.prog i{display:block;height:100%;background:var(--ok)}
+.sp{display:flex;justify-content:space-between;align-items:baseline}
+@media (prefers-reduced-motion:reduce){.book{transition:none}.book:hover{transform:none}}
 </style>
 </head>
 <body>
 <main>
-  <header>
+  <div class="top">
     <div>
       <div class="lbl">Brainiac · Painel central</div>
-      <h1>Todos os projetos, numa folha</h1>
+      <h1 id="title">Estante de cadernos</h1>
     </div>
-    <div class="live"><span id="live-state" class="stamp id"><span class="sd"></span>conectando</span><span id="stamp-time"></span></div>
-  </header>
+    <div class="row">
+      <button id="usage-btn" class="btn" aria-expanded="false"><span class="lbl">Uso</span><span id="usage-sum" class="mono" style="font-size:12px">—</span><span id="usage-chev" class="mono mu" style="font-size:12px">▾</span></button>
+      <span id="live" class="stamp live id"><span class="sd"></span>conectando</span>
+    </div>
+  </div>
+  <div id="usage" class="usage" hidden></div>
   <div id="banner"></div>
-  <section><div class="lbl" style="margin-bottom:8px">Uso das contas</div><div id="usage" class="usage"></div></section>
-  <section><div class="lbl" style="margin-bottom:8px">Projetos</div><div id="projects" class="projects"></div></section>
+  <div id="view"></div>
 </main>
 <script>
 const $ = (id) => document.getElementById(id);
-const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const STATUS = { running: ["ok", "rodando"], stopped: ["id", "parado"], error: ["er", "erro"], starting: ["at", "iniciando"] };
+const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const ST = { running: ["ok", "rodando"], stopped: ["id", "parado"], error: ["er", "erro"], starting: ["at", "iniciando"] };
+let snap = null, usageOpen = false;
+const sel = () => decodeURIComponent(location.hash.slice(1));
 const tone = (p) => (p >= 90 ? "er" : p >= 75 ? "at" : "");
 const resets = (iso) => {
   if (!iso) return "";
-  const s = Math.round((new Date(iso) - Date.now()) / 60000);
-  if (s <= 0) return "renovando";
-  return s < 60 ? `renova em ${s} min` : s < 1440 ? `renova em ${Math.round(s / 60)} h` : `renova em ${Math.round(s / 1440)} d`;
+  const m = Math.round((new Date(iso) - Date.now()) / 60000);
+  return m <= 0 ? "renovando" : m < 60 ? `renova em ${m} min` : m < 1440 ? `renova em ${Math.round(m / 60)} h` : `renova em ${Math.round(m / 1440)} d`;
 };
-function renderUsage(rows) {
-  $("usage").innerHTML = rows.length ? rows.map((a) => `
-    <div class="card"><div class="card-h"><h2>${esc(a.provider)}</h2><span class="mu">${esc(a.label)}</span></div>
-    <div class="card-b">${a.windows.map((w) => `
-      <div class="meter"><div class="row"><span>${esc(w.label)}</span><span class="mono">${w.percent}%</span></div>
-      <div class="bar ${tone(w.percent)}"><i style="width:${Math.min(100, w.percent)}%"></i></div>
-      <span class="mu" style="font-size:11px">${esc(resets(w.resets_at))}</span></div>`).join("")}</div></div>`).join("")
-    : '<div class="empty">Sem dados de uso.</div>';
+const maestro = (p) => p.agentes.find((a) => a.maestro);
+function estado(p) {
+  if (p.agentes.some((a) => a.status === "error")) return ["er", "com erro"];
+  if (p.agentes.some((a) => a.status === "running")) return ["ok", "em andamento"];
+  return ["id", "parado"];
 }
-function renderBranches(b) {
-  if (!b) return "";
-  const chips = (list) => list.length ? `<div class="chips">${list.map((n) => `<span class="chip">${esc(n.replace(/^origin\//, ""))}</span>`).join("")}</div>` : '<div class="empty">nenhuma</div>';
-  return `<div><div class="sec-t"><span class="lbl">Aguardando release</span>${b.commits_na_frente ? `<span class="stamp at">${b.commits_na_frente} commit(s) na frente</span>` : ""}</div>${chips(b.aguardando_release)}</div>
-    <div><div class="lbl">Em andamento (ainda fora da integração)</div>${chips(b.em_andamento)}</div>
-    <div><div class="lbl">Prontas para limpar (já na release)</div>${chips(b.limpar)}</div>`;
+function renderUsage() {
+  const rows = snap.usage || [];
+  const pick = (name) => { const r = rows.find((x) => x.provider === name); const w = r && r.windows[0]; return w ? `${name} ${w.percent}%` : null; };
+  $("usage-sum").textContent = ["claude", "codex"].map(pick).filter(Boolean).join(" · ") || "sem dados";
+  $("usage").hidden = !usageOpen;
+  $("usage-btn").setAttribute("aria-expanded", usageOpen);
+  $("usage-chev").textContent = usageOpen ? "▴" : "▾";
+  $("usage").innerHTML = rows.map((a) => `<div><h3>${esc(a.provider)} <span class="mu" style="font:400 12px 'Instrument Sans'">${esc(a.label)}</span></h3>${a.windows.map((w) => `
+    <div class="m"><span class="mu" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(w.label)} · ${esc(resets(w.resets_at))}</span><span class="mono" style="text-align:right">${w.percent}%</span>
+    <div class="bar ${tone(w.percent)}"><i style="width:${Math.min(100, w.percent)}%"></i></div></div>`).join("")}</div>`).join("");
 }
-function renderPlan(p) {
-  if (!p || !p.total) return '<div class="empty">Sem PLANO.md neste projeto.</div>';
-  return `<div class="sec-t"><span class="lbl">Plano de ação</span><span class="mu mono">${p.done}/${p.total}</span></div>
-    <div class="prog"><i style="width:${Math.round((p.done / p.total) * 100)}%"></i></div>
-    <ul class="steps">${p.steps.map((s) => `<li class="${s.state}"><span class="chk">${s.state === "done" ? "✓" : s.state === "doing" ? "▸" : ""}</span><span>${esc(s.text)}</span></li>`).join("")}</ul>`;
+function book(p) {
+  const [cls, label] = estado(p), m = maestro(p), mst = m ? ST[m.status]?.[1] || m.status : "sem maestro";
+  const b = p.branches, pl = p.plano;
+  const release = b ? (b.aguardando_release.length ? `${b.aguardando_release.length} aguardando release` : "Release em dia") : "Sem repositório ligado";
+  const plano = pl && pl.total ? `Plano ${pl.done}/${pl.total}` : "Sem plano";
+  const err = p.agentes.some((a) => a.status === "error");
+  return `<button class="book" data-open="${esc(p.apelido)}" aria-label="Abrir o caderno ${esc(p.nome)}, ${label}">
+    <span class="spine" aria-hidden="true" style="background:${esc(p.cor)}"><span>@${esc(p.apelido)}</span></span>
+    <span class="cover"><h3>${esc(p.nome)}</h3><span class="stamp ${cls}"><span class="sd"></span>${label}</span>
+    <span class="facts"><span><strong>${p.agentes.length}</strong> agentes</span><span>Maestro: ${esc(m ? m.nome + " · " + mst : mst)}</span><span>${esc(release)}</span><span>${esc(plano)}</span></span>
+    <span class="open-l">Abrir caderno →</span></span>${err ? '<span class="ribbon" aria-hidden="true"></span>' : ""}</button>`;
 }
-function renderProject(p) {
-  if (!p.encontrado) return `<article class="card"><div class="card-h"><h2>${esc(p.nome)}</h2><span class="stamp er">workspace não encontrado</span></div></article>`;
-  const maestro = p.agentes.find((a) => a.maestro);
-  const [cls, label] = STATUS[maestro?.status] || ["id", maestro ? maestro.status : "sem maestro"];
-  const term = maestro?.terminal?.length ? `<pre class="term">${esc(maestro.terminal.join("\n"))}</pre>` : "";
-  return `<article class="card">
-    <div class="card-h"><h2>${esc(p.nome)}</h2><span class="mono mu">@${esc(p.apelido)}</span><span class="stamp ${cls}" style="margin-left:auto"><span class="sd"></span>maestro ${esc(label)}</span></div>
-    <div class="card-b">
-      <div class="agents">${p.agentes.map((a) => {
-        const [c, l] = STATUS[a.status] || ["id", a.status];
-        return `<div class="ag ${a.maestro ? "maestro" : ""}"><span class="stamp ${c}"><span class="sd"></span>${esc(l)}</span><span class="n">${esc(a.nome)}</span><span class="p">${esc(a.provider)}${a.ultimo_turno ? " · " + esc(a.ultimo_turno) : ""}</span></div>${a.erro ? `<div class="err-note">${esc(a.erro)}</div>` : ""}`;
-      }).join("")}</div>
-      ${term}
-      ${renderPlan(p.plano)}
-      ${renderBranches(p.branches)}
-    </div></article>`;
+function renderShelf() {
+  $("title").textContent = "Estante de cadernos";
+  const ps = snap.projects, rows = [];
+  for (let i = 0; i < ps.length; i += 3) rows.push(ps.slice(i, i + 3));
+  const erros = ps.filter((p) => p.agentes.some((a) => a.status === "error")).length;
+  $("banner").innerHTML = erros ? `<div class="banner"><b>Marcadores vermelhos</b><span class="mu">${erros} caderno(s) com agente em erro. Abra o caderno para ver o que houve.</span></div>` : "";
+  $("view").innerHTML = rows.map((r) => `<div class="shelf"><div class="books">${r.map(book).join("")}</div><div class="plank"></div></div>`).join("");
 }
+function plan(pl) {
+  if (!pl || !pl.total) return '<div class="empty">Sem PLANO.md neste caderno ainda.</div>';
+  return `<div class="prog"><i style="width:${Math.round((pl.done / pl.total) * 100)}%"></i></div>` +
+    pl.steps.map((s) => `<div class="step ${s.state}"><span class="chk">${s.state === "done" ? "✓" : s.state === "doing" ? "▸" : ""}</span><span>${esc(s.text)}</span></div>`).join("");
+}
+function branches(b) {
+  if (!b) return '<div class="empty">Repositório não configurado neste caderno.</div>';
+  const t = (n, l, c) => `<div class="tile"><b style="color:${c}">${n}</b><span class="mu" style="font-size:12px">${l}</span></div>`;
+  const chips = (list) => list.length ? `<div class="chips">${list.map((n) => `<span class="chip">${esc(n.replace(/^origin\//, ""))}</span>`).join("")}</div>` : "";
+  return `<div class="tiles">${t(b.aguardando_release.length, "Aguardando release", b.aguardando_release.length ? "var(--attn)" : "var(--fg)")}${t(b.em_andamento.length, "Em andamento", "var(--fg)")}${t(b.limpar.length, "Prontas para limpar", b.limpar.length ? "var(--ok)" : "var(--fg)")}</div>` +
+    (b.aguardando_release.length ? `<div class="lbl" style="margin-top:6px">Aguardando release</div>${chips(b.aguardando_release)}` : "") +
+    (b.limpar.length ? `<div class="lbl" style="margin-top:6px">Prontas para limpar</div>${chips(b.limpar)}` : "");
+}
+function renderNotebook(p) {
+  $("title").textContent = p.nome;
+  $("banner").innerHTML = "";
+  if (!p.encontrado) { $("view").innerHTML = `<button class="btn" data-back>← Estante</button><div class="empty">Workspace "${esc(p.nome)}" não encontrado no Brainiac.</div>`; return; }
+  const m = maestro(p), [mc, ml] = m ? ST[m.status] || ["id", m.status] : ["id", "sem maestro"];
+  const term = m && m.terminal && m.terminal.length ? `<pre class="term">${esc(m.terminal.join("\n"))}</pre>` : '<div class="empty">Maestro parado. Sem saída para mostrar.</div>';
+  $("view").innerHTML = `
+    <div class="nbhead"><button class="btn" data-back>← Estante</button><span class="tag" aria-hidden="true" style="background:${esc(p.cor)}"></span>
+      <h2>${esc(p.nome)}</h2><span class="mono mu" style="font-size:12px">@${esc(p.apelido)}</span>
+      <span class="stamp big ${mc}" style="margin-left:auto"><span class="sd"></span>maestro ${esc(ml)}</span></div>
+    <div class="spread" style="border-top-color:${esc(p.cor)}">
+      <section>
+        <div class="sec"><span class="lbl">Agora · terminal de ${esc(m ? m.nome : "—")} · sem token</span>${term}</div>
+        <div class="sec"><span class="lbl">Agentes</span>${p.agentes.map((a) => { const [c, l] = ST[a.status] || ["id", a.status];
+          return `<div class="ag"><span class="stamp ${c}"><span class="sd"></span>${esc(l)}</span><span class="nm"><span style="font-weight:${a.maestro ? 700 : 500}">${esc(a.nome)}</span><span class="mu" style="font-size:12px">${esc(a.provider)}${a.ultimo_turno ? " · " + esc(a.ultimo_turno) : ""}</span></span>${a.erro ? `<span class="er">${esc(a.erro)}</span>` : ""}</div>`; }).join("")}</div>
+      </section>
+      <section>
+        <div class="sec"><div class="sp"><span class="lbl">Plano de ação</span><span class="mono mu" style="font-size:12px">${p.plano && p.plano.total ? p.plano.done + "/" + p.plano.total : "—"}</span></div>${plan(p.plano)}</div>
+        <div class="sec"><span class="lbl">Entregas</span>${branches(p.branches)}</div>
+      </section>
+    </div>`;
+}
+function render() {
+  if (!snap || !snap.ok) return;
+  renderUsage();
+  const p = snap.projects.find((x) => x.apelido === sel());
+  p ? renderNotebook(p) : renderShelf();
+}
+document.addEventListener("click", (e) => {
+  const o = e.target.closest("[data-open]"), b = e.target.closest("[data-back]");
+  if (o) location.hash = encodeURIComponent(o.dataset.open);
+  if (b) location.hash = "";
+});
+$("usage-btn").addEventListener("click", () => { usageOpen = !usageOpen; render(); });
+window.addEventListener("hashchange", render);
 async function refresh() {
   try {
-    const r = await fetch("/api/snapshot", { cache: "no-store" });
-    const s = await r.json();
-    $("banner").innerHTML = s.ok ? "" : `<div class="banner">Brainiac indisponível: ${esc(s.error)}</div>`;
-    $("live-state").className = "stamp " + (s.ok ? "ok" : "er");
-    $("live-state").innerHTML = `<span class="sd"></span>${s.ok ? "ao vivo" : "sem conexão"}`;
-    $("stamp-time").textContent = "atualizado " + new Date(s.generated_at).toLocaleTimeString("pt-BR");
-    if (s.ok) { renderUsage(s.usage); $("projects").innerHTML = s.projects.map(renderProject).join(""); }
-  } catch (e) {
-    $("live-state").className = "stamp er"; $("live-state").innerHTML = '<span class="sd"></span>painel offline';
-  }
+    snap = await (await fetch("/api/snapshot", { cache: "no-store" })).json();
+    const live = $("live");
+    live.className = "stamp live " + (snap.ok ? "ok" : "er");
+    live.innerHTML = `<span class="sd"></span>${snap.ok ? "ao vivo · " + new Date(snap.generated_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "sem conexão"}`;
+    if (!snap.ok) $("banner").innerHTML = `<div class="banner"><b>Brainiac indisponível</b><span class="mu">${esc(snap.error)}</span></div>`;
+    else render();
+  } catch (e) { $("live").className = "stamp live er"; $("live").innerHTML = '<span class="sd"></span>painel offline'; }
 }
 refresh(); setInterval(refresh, 10000);
 </script>
