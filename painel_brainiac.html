@@ -74,6 +74,17 @@ pre.term{margin:0;padding:14px 16px;border-radius:6px;background:var(--ink);colo
 .chip{padding:2px 8px;border:1px solid var(--line2);border-radius:4px;background:var(--surface2);font:11px 'JetBrains Mono',monospace}
 .prog{height:5px;border-radius:3px;background:var(--surface3);overflow:hidden}.prog i{display:block;height:100%;background:var(--ok)}
 .sp{display:flex;justify-content:space-between;align-items:baseline}
+.cmd{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:12px 14px;background:var(--surface);border:1px solid var(--line2);border-radius:8px;box-shadow:var(--e1)}
+.inp{min-height:44px;padding:0 12px;border-radius:6px;border:1px solid var(--line2);background:var(--surface2);color:var(--fg);font:14px 'Instrument Sans',sans-serif}
+.inp.grow{flex:1 1 320px;min-width:0}
+.inp:focus{outline:2px solid #2F55D4;outline-offset:1px}
+.btn.pri{background:var(--fg);color:var(--bg);border-color:var(--fg);font-weight:600}
+.btn.pri:hover{opacity:.88;background:var(--fg)}
+.confirm{padding:14px 16px;background:var(--surface);border:1px solid var(--line2);border-left:6px solid var(--seal);border-radius:8px;display:flex;flex-direction:column;gap:10px}
+.confirm[hidden]{display:none}
+.confirm q{display:block;padding:10px 12px;background:var(--surface2);border-radius:5px;font:13px/1.5 'JetBrains Mono',monospace;white-space:pre-wrap;word-break:break-word;quotes:none}
+.res{padding:10px 14px;border-radius:6px;border:1px solid currentColor;font-weight:600}
+.res.ok{color:var(--ok)}.res.er{color:var(--err)}
 @media (prefers-reduced-motion:reduce){.book{transition:none}.book:hover{transform:none}}
 </style>
 </head>
@@ -90,6 +101,14 @@ pre.term{margin:0;padding:14px 16px;border-radius:6px;background:var(--ink);colo
     </div>
   </div>
   <div id="usage" class="usage" hidden></div>
+  <form id="cmd" class="cmd" autocomplete="off">
+    <label for="cmd-to" class="lbl">Ordem para</label>
+    <select id="cmd-to" class="inp"></select>
+    <input id="cmd-text" class="inp grow" type="text" maxlength="2000" placeholder="Escreva a ordem. Dica: @automation faça X escolhe o destino" aria-label="Ordem para o maestro">
+    <button class="btn pri" type="submit">Enviar</button>
+  </form>
+  <div id="cmd-confirm" class="confirm" hidden></div>
+  <div id="cmd-result" role="status" aria-live="polite"></div>
   <div id="banner"></div>
   <div id="view"></div>
 </main>
@@ -177,12 +196,51 @@ function renderNotebook(p) {
       </section>
     </div>`;
 }
+function renderTargets() {
+  const el = $("cmd-to"), keep = el.value || sel();
+  el.innerHTML = snap.projects.filter((p) => p.encontrado && p.maestro_configurado !== false).map((p) => {
+    const m = maestro(p), on = m && m.status === "running";
+    return `<option value="${esc(p.apelido)}"${on ? "" : " disabled"}>${esc(p.nome)} · ${esc(m ? m.nome : "sem maestro")}${on ? "" : " (parado)"}</option>`;
+  }).join("");
+  const wanted = sel() && [...el.options].some((o) => o.value === sel() && !o.disabled) ? sel() : keep;
+  if ([...el.options].some((o) => o.value === wanted && !o.disabled)) el.value = wanted;
+}
 function render() {
   if (!snap || !snap.ok) return;
   renderUsage();
+  renderTargets();
   const p = snap.projects.find((x) => x.apelido === sel());
   p ? renderNotebook(p) : renderShelf();
 }
+let pending = null;
+function showResult(ok, text) { $("cmd-result").innerHTML = `<div class="res ${ok ? "ok" : "er"}">${esc(text)}</div>`; }
+$("cmd").addEventListener("submit", (e) => {
+  e.preventDefault();
+  let to = $("cmd-to").value, text = $("cmd-text").value.trim();
+  const m = text.match(/^@(\S+)\s+([\s\S]+)$/);
+  if (m && snap.projects.some((p) => p.apelido === m[1].toLowerCase())) { to = m[1].toLowerCase(); text = m[2].trim(); }
+  const p = snap.projects.find((x) => x.apelido === to);
+  if (!p || !text) return showResult(false, "Escolha o destino e escreva a ordem.");
+  const mm = maestro(p);
+  if (!mm || mm.status !== "running") return showResult(false, `O maestro de ${p.nome} está parado. Inicie-o no Brainiac antes de enviar.`);
+  pending = { projeto: to, mensagem: text };
+  $("cmd-result").innerHTML = "";
+  $("cmd-confirm").hidden = false;
+  $("cmd-confirm").innerHTML = `<span class="lbl">Confirmar envio</span><div>Enviar para <strong>${esc(mm.nome)}</strong> (${esc(p.nome)}):</div><q>${esc(text)}</q>
+    <div class="row"><button class="btn pri" type="button" data-send>Confirmar e enviar</button><button class="btn" type="button" data-cancel>Cancelar</button></div>`;
+  $("cmd-confirm").querySelector("[data-send]").focus();
+});
+$("cmd-confirm").addEventListener("click", async (e) => {
+  if (e.target.closest("[data-cancel]")) { pending = null; $("cmd-confirm").hidden = true; return; }
+  if (!e.target.closest("[data-send]") || !pending) return;
+  const body = pending; pending = null; $("cmd-confirm").hidden = true;
+  try {
+    const r = await fetch("/api/enviar", { method: "POST", headers: { "Content-Type": "application/json", "X-Painel": "1" }, body: JSON.stringify(body) });
+    const d = await r.json();
+    if (d.ok) { showResult(true, `Enviado a ${d.maestro} (${d.projeto}).`); $("cmd-text").value = ""; }
+    else showResult(false, d.erro || "Não foi possível enviar.");
+  } catch (err) { showResult(false, "Painel offline: nada foi enviado."); }
+});
 document.addEventListener("click", (e) => {
   const o = e.target.closest("[data-open]"), b = e.target.closest("[data-back]");
   if (o) location.hash = encodeURIComponent(o.dataset.open);

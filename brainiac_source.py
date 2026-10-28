@@ -179,6 +179,60 @@ def build_snapshot(config: dict[str, Any], brainiac_dir: Path | None = None,
     return snap
 
 
+MAX_MESSAGE = 2000
+
+
+class SendError(Exception):
+    def __init__(self, status: int, message: str) -> None:
+        super().__init__(message)
+        self.status = status
+        self.message = message
+
+
+def clean_message(text: Any) -> str:
+    """Uma linha so, sem caracteres de controle (nada de ESC nem de Enter embutido)."""
+    if not isinstance(text, str):
+        raise SendError(400, "Mensagem invalida.")
+    one_line = re.sub(r"[\x00-\x1f\x7f]+", " ", text).strip()
+    if not one_line:
+        raise SendError(400, "Escreva a mensagem antes de enviar.")
+    if len(one_line) > MAX_MESSAGE:
+        raise SendError(400, f"Mensagem acima de {MAX_MESSAGE} caracteres.")
+    return one_line
+
+
+def send_to_maestro(config: dict[str, Any], alias: str, text: Any, brainiac_dir: Path | None = None,
+                    runner: Callable[..., Any] = subprocess.run, pause: Callable[[float], None] | None = None) -> dict[str, Any]:
+    """Digita a mensagem no terminal do maestro do projeto e confirma com Enter.
+
+    So envia a um maestro configurado em projetos.json e que esteja rodando.
+    """
+    message = clean_message(text)
+    proj = next((p for p in config.get("projetos", []) if p.get("apelido") == alias), None)
+    if not proj:
+        raise SendError(404, "Projeto desconhecido.")
+    try:
+        workspaces = call("workspaces.list", {}, brainiac_dir, runner)
+        agents = call("agents.list", {}, brainiac_dir, runner)
+    except BrainiacError as exc:
+        raise SendError(502, str(exc)) from exc
+    ws = next((w for w in workspaces if w.get("name") == proj.get("workspace")), None)
+    agent = next((a for a in agents if ws and a.get("workspaceId") == ws.get("id")
+                  and a.get("name") == proj.get("maestro")), None)
+    if not agent:
+        raise SendError(404, "Maestro nao encontrado no Brainiac.")
+    if agent.get("status") != "running" or not agent.get("terminalId"):
+        raise SendError(409, f"O maestro {agent.get('name')} esta parado. Inicie-o no Brainiac e tente de novo.")
+    wait = pause or __import__("time").sleep
+    try:
+        call("terminals.input", {"id": agent["terminalId"], "data": message}, brainiac_dir, runner)
+        wait(0.4)
+        call("terminals.input", {"id": agent["terminalId"], "data": "\r"}, brainiac_dir, runner)
+    except BrainiacError as exc:
+        raise SendError(502, str(exc)) from exc
+    return {"ok": True, "projeto": proj.get("workspace"), "maestro": agent.get("name"), "tamanho": len(message)}
+
+
 def load_config(path: Path = CONFIG) -> dict[str, Any]:
     try:
         return json.loads(path.read_text(encoding="utf-8"))

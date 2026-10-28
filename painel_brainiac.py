@@ -47,6 +47,47 @@ class Handler(BaseHTTPRequestHandler):
         else:
             self._send(404, b"nao encontrado", "text/plain; charset=utf-8")
 
+    def _origin_ok(self) -> bool:
+        """So aceita pedidos da propria pagina local (bloqueia sites de fora chamando 127.0.0.1)."""
+        port = self.server.server_address[1]
+        hosts = {f"127.0.0.1:{port}", f"localhost:{port}"}
+        origin = self.headers.get("Origin")
+        return (self.headers.get("Host") in hosts and self.headers.get("X-Painel") == "1"
+                and (origin is None or origin in {f"http://{h}" for h in hosts}))
+
+    def do_POST(self) -> None:  # noqa: N802
+        if self.path.split("?", 1)[0] != "/api/enviar":
+            self._send(404, b"nao encontrado", "text/plain; charset=utf-8")
+            return
+        if not self._origin_ok():
+            self._send_json(403, {"ok": False, "erro": "Pedido recusado."})
+            return
+        try:
+            size = int(self.headers.get("Content-Length") or 0)
+            body = json.loads(self.rfile.read(min(size, 16384)) or b"{}")
+            result = source.send_to_maestro(source.load_config(), str(body.get("projeto", "")), body.get("mensagem"))
+            self._log_send(result)
+            self._send_json(200, result)
+        except source.SendError as exc:
+            self._send_json(exc.status, {"ok": False, "erro": exc.message})
+        except (ValueError, TypeError):
+            self._send_json(400, {"ok": False, "erro": "Pedido invalido."})
+
+    def _send_json(self, status: int, data: dict) -> None:
+        self._send(status, json.dumps(data, ensure_ascii=False).encode("utf-8"), "application/json; charset=utf-8")
+
+    @staticmethod
+    def _log_send(result: dict) -> None:
+        """Registra so quando, para quem e o tamanho; nunca o texto da ordem."""
+        try:
+            runtime = ROOT / "runtime"
+            runtime.mkdir(exist_ok=True)
+            with (runtime / "enviados.jsonl").open("a", encoding="utf-8") as f:
+                f.write(json.dumps({"em": time.strftime("%Y-%m-%dT%H:%M:%S"), "projeto": result["projeto"],
+                                    "maestro": result["maestro"], "tamanho": result["tamanho"]}, ensure_ascii=False) + "\n")
+        except OSError:
+            pass
+
     def log_message(self, *_args) -> None:
         pass
 
