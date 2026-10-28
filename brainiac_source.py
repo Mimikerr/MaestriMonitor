@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
-from terminal_screen import render_terminal
+from terminal_screen import render_responses
 
 ROOT = Path(__file__).resolve().parent
 CONFIG = ROOT / "projetos.json"
@@ -179,7 +179,7 @@ def build_snapshot(config: dict[str, Any], brainiac_dir: Path | None = None,
                     try:
                         cols, rows = _terminal_size(ws["id"], ag["terminalId"], brainiac_dir, runner)
                         sb = call("terminals.scrollback", {"id": ag["terminalId"]}, brainiac_dir, runner)
-                        row["terminal"] = render_terminal(sb.get("data", ""), cols, rows, keep=18)
+                        row["terminal"] = render_responses(sb.get("data", ""), cols, rows, keep=60)
                     except BrainiacError:
                         pass
                 item["agentes"].append(row)

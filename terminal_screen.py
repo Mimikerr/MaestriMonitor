@@ -219,3 +219,52 @@ def render_terminal(raw: str, cols: int = 120, rows: int = 40, keep: int = 16) -
     while out and not out[-1].strip():
         out.pop()
     return out[-keep:]
+
+
+_BULLET = re.compile(r"^[●•]\s+(.*)$")
+_TOOL_CALL = re.compile(r"^[A-Z][A-Za-z]+\(.*")
+_TOOL_SUMMARY = re.compile(r"^\s*(Listed|Ran|Read|Searched|Wrote|Edited|Fetched|Created|Updated|Explored|Called|Found|Searching|Reading|Running|Listing)\b")
+MAX_INDENT = 8
+
+
+def extract_responses(lines: list[str], keep: int = 60) -> list[str]:
+    """So as respostas do agente: blocos que comecam com a bolinha (`●`/`•`) e suas continuacoes.
+
+    Fica de fora o ruido da interface: chamadas e resumos de ferramentas, temporizadores,
+    avisos de atualizacao e permissao, campo de entrada e separadores.
+    """
+    blocks: list[list[str]] = []
+    cur: list[str] | None = None
+    for ln in lines:
+        m = _BULLET.match(ln)
+        if m:
+            cur = None
+            if not _TOOL_CALL.match(m.group(1)):
+                cur = [m.group(1)]
+                blocks.append(cur)
+            continue
+        if cur is None:
+            continue
+        if not ln.strip():
+            cur.append("")
+            continue
+        indent = len(ln) - len(ln.lstrip(" "))
+        if indent == 0 or _TOOL_SUMMARY.match(ln):
+            cur = None
+        elif indent <= MAX_INDENT:
+            cur.append(ln[2:] if ln.startswith("  ") else ln)
+        # indent grande = aviso alinhado a direita da interface: ignora sem fechar o bloco
+    out: list[str] = []
+    for b in blocks:
+        while b and not b[-1].strip():
+            b.pop()
+        if out and b:
+            out.append("")
+        out.extend(b)
+    return out[-keep:]
+
+
+def render_responses(raw: str, cols: int = 120, rows: int = 40, keep: int = 60) -> list[str]:
+    scr = Screen(cols, rows)
+    scr.feed(raw or "")
+    return extract_responses([ln[:240] for ln in scr.lines()], keep)

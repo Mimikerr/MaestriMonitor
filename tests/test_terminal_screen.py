@@ -43,3 +43,39 @@ class ScreenTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ResponsesTests(unittest.TestCase):
+    def setUp(self):
+        from terminal_screen import extract_responses
+        self.extract = extract_responses
+
+    def test_so_blocos_de_resposta_sem_ruido_da_interface(self):
+        lines = [
+            "● Primeira resposta.",
+            "  continua aqui",
+            "",
+            "  - item da lista",
+            "    com quebra",
+            "",
+            "  Listed 1 directory, ran 3 shell commands",
+            "",
+            "● Segunda resposta.",
+            "",
+            "✻ Churned for 51s · done 14:31",
+            "                              bash denied by auto mode · /permissions",
+            "────────",
+            "❯",
+        ]
+        self.assertEqual(self.extract(lines), [
+            "Primeira resposta.", "continua aqui", "", "- item da lista", "  com quebra", "", "Segunda resposta."])
+
+    def test_chamada_de_ferramenta_com_bolinha_nao_e_resposta(self):
+        self.assertEqual(self.extract(["● Bash(ls -la)", "  saida", "● Pronto."]), ["Pronto."])
+
+    def test_aviso_alinhado_a_direita_nao_fecha_o_bloco(self):
+        lines = ["● Resposta", "                                  Update available!", "  segue o texto"]
+        self.assertEqual(self.extract(lines), ["Resposta", "segue o texto"])
+
+    def test_sem_resposta_devolve_vazio(self):
+        self.assertEqual(self.extract(["❯ ", "─────", "⏵⏵ auto mode on"]), [])

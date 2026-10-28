@@ -186,14 +186,15 @@ function renderNotebook(p) {
   $("banner").innerHTML = "";
   if (!p.encontrado) { $("view").innerHTML = `<button class="btn" data-back>← Estante</button><div class="empty">Workspace "${esc(p.nome)}" não encontrado no Brainiac.</div>`; return; }
   const m = maestro(p), [mc, ml] = m ? ST[m.status] || ["id", m.status] : ["id", "sem maestro"];
-  const term = m && m.terminal && m.terminal.length ? `<pre class="term">${esc(m.terminal.join("\n"))}</pre>` : '<div class="empty">Maestro parado. Sem saída para mostrar.</div>';
+  const term = m && m.terminal && m.terminal.length ? `<pre class="term">${esc(m.terminal.join("\n"))}</pre>`
+    : `<div class="empty">${m && m.status === "running" ? "Sem respostas ainda." : "Maestro parado. Sem respostas para mostrar."}</div>`;
   $("view").innerHTML = `
     <div class="nbhead"><button class="btn" data-back>← Estante</button><span class="tag" aria-hidden="true" style="background:${esc(p.cor)}"></span>
       <h2>${esc(p.nome)}</h2><span class="mono mu" style="font-size:12px">@${esc(p.apelido)}</span>
       <span class="stamp big ${mc}" style="margin-left:auto"><span class="sd"></span>maestro ${esc(ml)}</span></div>
     <div class="spread" style="border-top-color:${esc(p.cor)}">
       <section>
-        <div class="sec"><span class="lbl">Agora · terminal de ${esc(m ? m.nome : "—")} · sem token</span>${term}</div>
+        <div class="sec"><span class="lbl">Respostas de ${esc(m ? m.nome : "—")} · sem token</span>${term}</div>
         <div class="sec"><span class="lbl">Agentes</span>${p.agentes.map((a) => { const [c, l] = ST[a.status] || ["id", a.status];
           return `<div class="ag"><span class="stamp ${c}"><span class="sd"></span>${esc(l)}</span><span class="nm"><span style="font-weight:${a.maestro ? 700 : 500}">${esc(a.nome)}</span><span class="mu" style="font-size:12px">${esc(a.provider)}${a.ultimo_turno ? " · " + esc(a.ultimo_turno) : ""}</span></span>${a.erro ? `<span class="er">${esc(a.erro)}</span>` : ""}</div>`; }).join("")}</div>
       </section>
@@ -203,11 +204,25 @@ function renderNotebook(p) {
       </section>
     </div>`;
 }
-function render() {
+let lastSig = "", lastView = "";
+function render(force) {
   if (!snap || !snap.ok) return;
+  const sig = JSON.stringify({ ...snap, generated_at: 0 }) + "|" + usageOpen + "|" + sel();
+  if (!force && sig === lastSig && $("view").innerHTML) return;
+  lastSig = sig;
+  const old = document.querySelector("pre.term");
+  const keep = old && lastView === sel() ? { top: old.scrollTop, bottom: old.scrollTop + old.clientHeight >= old.scrollHeight - 8 } : null;
+  lastView = sel();
   renderUsage();
   const p = snap.projects.find((x) => x.apelido === sel());
   p ? renderNotebook(p) : renderShelf();
+  const t = document.querySelector("pre.term");
+  if (t) {
+    const stick = !keep || keep.bottom;
+    t.scrollTop = stick ? t.scrollHeight : keep.top;
+    // as fontes da web chegam depois e mudam a altura do texto: recoloca no final
+    if (stick && document.fonts && document.fonts.ready) document.fonts.ready.then(() => { if (document.body.contains(t)) t.scrollTop = t.scrollHeight; });
+  }
   document.querySelector("main").classList.toggle("shelf", !p);
   syncComposer();
 }
