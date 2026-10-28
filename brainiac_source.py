@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
-from terminal_screen import render_responses
+from terminal_screen import render_response_cards, render_responses
 
 ROOT = Path(__file__).resolve().parent
 CONFIG = ROOT / "projetos.json"
@@ -189,12 +189,13 @@ def build_snapshot(config: dict[str, Any], brainiac_dir: Path | None = None,
                 is_maestro = ag.get("name") == proj.get("maestro")
                 row = {"nome": ag.get("name", ""), "provider": ag.get("provider", ""),
                        "status": ag.get("status", ""), "erro": ag.get("error"), "maestro": is_maestro,
-                       "ultimo_turno": _relative(last, now), "terminal": []}
+                       "ultimo_turno": _relative(last, now), "terminal": [], "respostas": []}
                 if is_maestro and ag.get("terminalId") and ag.get("status") == "running":
                     try:
                         cols, rows = _terminal_size(ws["id"], ag["terminalId"], brainiac_dir, runner)
                         sb = call("terminals.scrollback", {"id": ag["terminalId"]}, brainiac_dir, runner)
                         row["terminal"] = render_responses(sb.get("data", ""), cols, rows, keep=60)
+                        row["respostas"] = render_response_cards(sb.get("data", ""), cols, rows, keep=6)
                     except BrainiacError:
                         pass
                 item["agentes"].append(row)

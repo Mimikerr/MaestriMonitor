@@ -79,3 +79,22 @@ class ResponsesTests(unittest.TestCase):
 
     def test_sem_resposta_devolve_vazio(self):
         self.assertEqual(self.extract(["❯ ", "─────", "⏵⏵ auto mode on"]), [])
+
+
+class StructureTests(unittest.TestCase):
+    def test_une_linhas_quebradas_em_paragrafos_e_listas(self):
+        from terminal_screen import structure_block
+        block = ["Primeira linha de um", "paragrafo quebrado.", "", "- item um que", "  continua aqui", "- item dois", "",
+                 "1. passo", "2) outro"]
+        self.assertEqual(structure_block(block), [
+            {"t": "p", "n": "", "x": "Primeira linha de um paragrafo quebrado."},
+            {"t": "li", "n": "", "x": "item um que continua aqui"},
+            {"t": "li", "n": "", "x": "item dois"},
+            {"t": "li", "n": "1.", "x": "passo"},
+            {"t": "li", "n": "2)", "x": "outro"}])
+
+    def test_cada_resposta_vira_um_cartao_e_so_as_ultimas_ficam(self):
+        from terminal_screen import render_response_cards
+        raw = "\r\n".join(["● um", "  ", "  Ran 1 shell command", "● dois", "● tres", "✻ Churned for 3s"])
+        cards = render_response_cards(raw, 60, 20, keep=2)
+        self.assertEqual([c[0]["x"] for c in cards], ["dois", "tres"])

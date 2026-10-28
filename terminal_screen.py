@@ -227,12 +227,8 @@ _TOOL_SUMMARY = re.compile(r"^\s*(Listed|Ran|Read|Searched|Wrote|Edited|Fetched|
 MAX_INDENT = 8
 
 
-def extract_responses(lines: list[str], keep: int = 60) -> list[str]:
-    """So as respostas do agente: blocos que comecam com a bolinha (`●`/`•`) e suas continuacoes.
-
-    Fica de fora o ruido da interface: chamadas e resumos de ferramentas, temporizadores,
-    avisos de atualizacao e permissao, campo de entrada e separadores.
-    """
+def extract_blocks(lines: list[str]) -> list[list[str]]:
+    """Cada resposta do agente (bloco que comeca com a bolinha) como lista de linhas, sem o ruido da interface."""
     blocks: list[list[str]] = []
     cur: list[str] | None = None
     for ln in lines:
@@ -254,17 +250,54 @@ def extract_responses(lines: list[str], keep: int = 60) -> list[str]:
         elif indent <= MAX_INDENT:
             cur.append(ln[2:] if ln.startswith("  ") else ln)
         # indent grande = aviso alinhado a direita da interface: ignora sem fechar o bloco
-    out: list[str] = []
     for b in blocks:
         while b and not b[-1].strip():
             b.pop()
-        if out and b:
+    return [b for b in blocks if b]
+
+
+def extract_responses(lines: list[str], keep: int = 60) -> list[str]:
+    """Respostas do agente em linhas corridas (separadas por uma linha vazia)."""
+    out: list[str] = []
+    for b in extract_blocks(lines):
+        if out:
             out.append("")
         out.extend(b)
     return out[-keep:]
+
+
+_ITEM = re.compile(r"^(?:([-*•])|(\d{1,2}[.)]))\s+(.*)$")
+
+
+def structure_block(lines: list[str]) -> list[dict[str, str]]:
+    """Desfaz a quebra de linha do terminal: paragrafos (`p`) e itens de lista (`li`)."""
+    items: list[dict[str, str]] = []
+    after_blank = True
+    for raw in lines:
+        text = raw.strip()
+        if not text:
+            after_blank = True
+            continue
+        m = _ITEM.match(text)
+        if m:
+            items.append({"t": "li", "n": m.group(2) or "", "x": m.group(3)})
+        elif items and not after_blank:
+            items[-1]["x"] += " " + text
+        else:
+            items.append({"t": "p", "n": "", "x": text})
+        after_blank = False
+    return items
 
 
 def render_responses(raw: str, cols: int = 120, rows: int = 40, keep: int = 60) -> list[str]:
     scr = Screen(cols, rows)
     scr.feed(raw or "")
     return extract_responses([ln[:240] for ln in scr.lines()], keep)
+
+
+def render_response_cards(raw: str, cols: int = 120, rows: int = 40, keep: int = 6) -> list[list[dict[str, str]]]:
+    """As ultimas `keep` respostas do agente, cada uma ja estruturada em paragrafos e listas."""
+    scr = Screen(cols, rows)
+    scr.feed(raw or "")
+    blocks = extract_blocks([ln[:240] for ln in scr.lines()])
+    return [structure_block(b) for b in blocks[-keep:]]
